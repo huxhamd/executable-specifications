@@ -13,7 +13,7 @@ By the end you'll have practised the full loop four times, including one unhappy
 | Folder | What it holds | Owner |
 | --- | --- | --- |
 | `acceptance/Specs` | The executable specifications | You, locked from the agent |
-| `acceptance/Dsl` | The domain vocabulary the specs speak | You, agent may propose |
+| `acceptance/Dsl` | The domain vocabulary the specs speak (Domain Specific Language) | You, agent may propose |
 | `acceptance/Drivers` | The contract: API routes and JSON, UI test IDs | You, agent may propose |
 | `api/` | ASP.NET Core API, its unit tests | Agent |
 | `web/` | Angular app, its unit tests | Agent |
