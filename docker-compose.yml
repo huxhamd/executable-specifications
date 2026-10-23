@@ -1,0 +1,13 @@
+name: todo-exec-spec
+
+services:
+  api:
+    build: ./api
+    image: todo-exec-spec-api
+    container_name: todo-exec-spec-api
+  web:
+    build: ./web
+    image: todo-exec-spec-web
+    container_name: todo-exec-spec-web
+    ports: ["4200:80"]
+    depends_on: [api]
