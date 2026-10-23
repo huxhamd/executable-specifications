@@ -1,9 +1,9 @@
 namespace acceptance.Dsl;
 
-public static class Alias
+public class Alias
 {
-    private readonly static string _suffix = Guid.NewGuid().ToString("N")[..6];
+    private readonly string _suffix = Guid.NewGuid().ToString("N")[..6];
 
-    public static string For(string name) =>
+    public string For(string name) =>
         string.IsNullOrWhiteSpace(name) ? name : $"{name}_{_suffix}";
 }
