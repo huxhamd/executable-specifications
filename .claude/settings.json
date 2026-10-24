@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "deny": [
+        "Edit(/acceptance/**)",
+        "Edit(/.claude/settings.json)",
+        "Edit(/.claude/hooks/check-acceptance.ps1)"
+    ],
+    "ask": [
+        "Edit(/CLAUDE.md)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File .claude/hooks/check-acceptance.ps1"
+          }
+        ]
+      }
+    ]
+  }
+}

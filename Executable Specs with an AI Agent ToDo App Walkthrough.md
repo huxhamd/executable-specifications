@@ -13,7 +13,7 @@ By the end you'll have practised the full loop four times, including one unhappy
 | Folder | What it holds | Owner |
 | --- | --- | --- |
 | `acceptance/Specs` | The executable specifications | You, locked from the agent |
-| `acceptance/Dsl` | The domain vocabulary the specs speak (Domain Specific Language) | You, agent may propose |
+| `acceptance/Dsl` | The domain vocabulary the specs speak | You, agent may propose |
 | `acceptance/Drivers` | The contract: API routes and JSON, UI test IDs | You, agent may propose |
 | `api/` | ASP.NET Core API, its unit tests | Agent |
 | `web/` | Angular app, its unit tests | Agent |
@@ -136,22 +136,22 @@ This is the one-off setup cost. Type these files in yourself rather than pasting
 
 ```
 acceptance/
-  AcceptanceTest.cs     picks a driver, builds the DSL
-  Dsl/Aliases.cs        unique names per test
+  AcceptanceTestBase.cs     picks a driver, builds the DSL
+  Dsl/Alias.cs        unique names per test
   Dsl/UserDsl.cs        the vocabulary specs use
-  Drivers/ActionResult.cs
+  Drivers/DriverResult.cs
   Drivers/ITodoDriver.cs
   Drivers/ApiTodoDriver.cs
   Drivers/UiTodoDriver.cs
   Specs/                empty for now
 ```
 
-### Dsl/Aliases.cs
+### Dsl/Alias.cs
 
 Every test gets its own suffix, so "Buy milk" becomes "Buy milk 3f9a1c". Tests never see each other's data, so there's no database reset and they can run in parallel. Blank names stay blank, so you can still test empty input.
 
 ```csharp
-public class Aliases
+public class Alias
 {
     private readonly string _suffix = Guid.NewGuid().ToString("N")[..6];
 
@@ -160,20 +160,22 @@ public class Aliases
 }
 ```
 
-### Drivers/ActionResult.cs
+### Drivers/DriverResult.cs
 
 Drivers report what happened instead of throwing. The DSL decides whether that outcome was expected.
 
 ```csharp
 using Xunit;
 
-public record ActionResult(bool Succeeded, string Error = "")
+public record DriverResult(bool IsSuccess, string Error = "")
 {
-    public static readonly ActionResult Ok = new(true);
-    public static ActionResult Failed(string error) => new(false, error);
+    public bool IsFailure => !IsSuccess;
+
+    public static readonly DriverResult Ok = new(true);
+    public static DriverResult Failed(string error) => new(false, error);
 
     public void ShouldSucceed(string because) =>
-        Assert.True(Succeeded, $"{because}. The system said: {Error}");
+        Assert.True(IsSuccess, $"{because}. The system said: {Error}");
 }
 ```
 
@@ -182,10 +184,10 @@ public record ActionResult(bool Succeeded, string Error = "")
 ```csharp
 public interface ITodoDriver
 {
-    Task<ActionResult> AddTodo(string title);
-    Task<ActionResult> CompleteTodo(string title);
-    Task ConfirmShown(string title);
-    Task ConfirmComplete(string title);
+    Task<DriverResult> AddTodo(string title);
+    Task<DriverResult> CompleteTodo(string title);
+    Task ConfirmTodoIsShown(string title);
+    Task ConfirmTodoIsComplete(string title);
 }
 ```
 
@@ -203,30 +205,30 @@ using Xunit;
 //   POST /api/todos/{id}/complete  -> 2xx
 public class ApiTodoDriver(HttpClient http) : ITodoDriver
 {
-    public async Task<ActionResult> AddTodo(string title) =>
+    public async Task<DriverResult> AddTodo(string title) =>
         await ToResult(await http.PostAsJsonAsync("/api/todos", new { title }));
 
-    public async Task<ActionResult> CompleteTodo(string title)
+    public async Task<DriverResult> CompleteTodo(string title)
     {
         var todo = await Find(title);
-        if (todo is null) return ActionResult.Failed($"No todo titled '{title}'");
+        if (todo is null) return DriverResult.Failed($"No todo titled '{title}'");
         return await ToResult(await http.PostAsync($"/api/todos/{todo.Id}/complete", null));
     }
 
-    public async Task ConfirmShown(string title) =>
+    public async Task ConfirmTodoIsShown(string title) =>
         Assert.True(await Find(title) is not null, $"Expected '{title}' in GET /api/todos");
 
-    public async Task ConfirmComplete(string title) =>
+    public async Task ConfirmTodoIsComplete(string title) =>
         Assert.True((await Find(title))?.Completed == true, $"Expected '{title}' to be completed");
 
     private async Task<TodoDto?> Find(string title) =>
         (await http.GetFromJsonAsync<List<TodoDto>>("/api/todos"))!
             .FirstOrDefault(t => t.Title == title);
 
-    private static async Task<ActionResult> ToResult(HttpResponseMessage response) =>
+    private static async Task<DriverResult> ToResult(HttpResponseMessage response) =>
         response.IsSuccessStatusCode
-            ? ActionResult.Ok
-            : ActionResult.Failed(await response.Content.ReadAsStringAsync());
+            ? DriverResult.Ok
+            : DriverResult.Failed(await response.Content.ReadAsStringAsync());
 
     private record TodoDto(int Id, string Title, bool Completed);
 }
@@ -250,35 +252,35 @@ using static Microsoft.Playwright.Assertions;
 //   error-message   visible when the last action was rejected
 public class UiTodoDriver(IPage page) : ITodoDriver
 {
-    public async Task<ActionResult> AddTodo(string title)
+    public async Task<DriverResult> AddTodo(string title)
     {
         await page.GotoAsync("/");
         await page.GetByTestId("new-todo-title").FillAsync(title);
         await page.GetByTestId("add-todo").ClickAsync();
-        return await Outcome(Item(title));
+        return await Outcome(LocateTodo(title));
     }
 
-    public async Task<ActionResult> CompleteTodo(string title)
+    public async Task<DriverResult> CompleteTodo(string title)
     {
         await page.GotoAsync("/");
-        await Item(title).GetByTestId("complete-todo").ClickAsync();
-        return await Outcome(Item(title).And(page.Locator("[data-completed='true']")));
+        await LocateTodo(title).GetByTestId("complete-todo").ClickAsync();
+        return await Outcome(LocateCompletedTodo(title));
     }
 
-    public async Task ConfirmShown(string title)
+    public async Task ConfirmTodoIsShown(string title)
     {
         await page.GotoAsync("/");
-        await Expect(Item(title)).ToBeVisibleAsync();
+        await Expect(LocateTodo(title)).ToBeVisibleAsync();
     }
 
-    public async Task ConfirmComplete(string title)
+    public async Task ConfirmTodoIsComplete(string title)
     {
         await page.GotoAsync("/");
-        await Expect(Item(title)).ToHaveAttributeAsync("data-completed", "true");
+        await Expect(LocateCompletedTodo(title)).ToBeVisibleAsync();
     }
 
     // Exact title match, so "" only matches a todo whose title really is blank.
-    private ILocator Item(string title) =>
+    private ILocator LocateTodo(string title) =>
         page.GetByTestId("todo-item").Filter(new()
         {
             Has = page.GetByTestId("todo-title").Filter(new()
@@ -287,31 +289,42 @@ public class UiTodoDriver(IPage page) : ITodoDriver
             })
         });
 
+    private ILocator LocateCompletedTodo(string title) =>
+        LocateTodo(title).And(page.Locator("[data-completed='true']"));
+
     // Wait for whichever comes first: the expected change, or an error.
-    private async Task<ActionResult> Outcome(ILocator success)
+    private async Task<DriverResult> Outcome(ILocator success)
     {
         var error = page.GetByTestId("error-message");
-        await success.Or(error).First.WaitForAsync();
+        try
+        {
+            await success.Or(error).First.WaitForAsync();
+        }
+        catch (TimeoutException)
+        {
+            return DriverResult.Failed(
+                "Nothing happened: neither the expected change nor an error appeared");
+        }
         return await error.IsVisibleAsync()
-            ? ActionResult.Failed(await error.InnerTextAsync())
-            : ActionResult.Ok;
+            ? DriverResult.Failed(await error.InnerTextAsync())
+            : DriverResult.Ok;
     }
 }
 ```
 
 ### Dsl/UserDsl.cs
 
-The explicit style you chose: `AddTodo` must succeed, `AttemptToAddTodo` just tries, and confirmations are their own lines.
+Each action comes in two forms. `AddTodo` must succeed and fails the test on that line if it doesn't. `AttemptToAddTodo` just tries and records the outcome, so the next line can check that the rejection was the right one. Confirmations are always lines of their own.
 
 ```csharp
 using Xunit;
 
-public class UserDsl(ITodoDriver driver, Aliases aliases)
+public class UserDsl(ITodoDriver driver, Alias alias)
 {
-    private ActionResult? _last;
+    private DriverResult? _last;
 
     public async Task AttemptToAddTodo(string title) =>
-        _last = await driver.AddTodo(aliases.For(title));
+        _last = await driver.AddTodo(alias.For(title));
 
     public async Task AddTodo(string title)
     {
@@ -320,7 +333,7 @@ public class UserDsl(ITodoDriver driver, Aliases aliases)
     }
 
     public async Task AttemptToCompleteTodo(string title) =>
-        _last = await driver.CompleteTodo(aliases.For(title));
+        _last = await driver.CompleteTodo(alias.For(title));
 
     public async Task CompleteTodo(string title)
     {
@@ -328,34 +341,32 @@ public class UserDsl(ITodoDriver driver, Aliases aliases)
         _last!.ShouldSucceed($"Could not complete todo '{title}'");
     }
 
-    public Task ConfirmTodoShown(string title) => driver.ConfirmShown(aliases.For(title));
+    public Task ConfirmTodoIsShown(string title) => driver.ConfirmTodoIsShown(alias.For(title));
 
-    public Task ConfirmTodoComplete(string title) => driver.ConfirmComplete(aliases.For(title));
+    public Task ConfirmTodoIsComplete(string title) => driver.ConfirmTodoIsComplete(alias.For(title));
 
-    public Task ConfirmErrorShown(string message)
+    public Task ConfirmErrorIsShown(string message)
     {
         Assert.NotNull(_last);
-        Assert.False(_last.Succeeded, "Expected the last action to be rejected, but it succeeded");
+        Assert.True(_last.IsFailure, "Expected the last action to be rejected, but it succeeded");
         Assert.Contains(message, _last.Error, StringComparison.OrdinalIgnoreCase);
         return Task.CompletedTask;
     }
 }
 ```
 
-### AcceptanceTest.cs
+### AcceptanceTestBase.cs
 
-The `DRIVER` environment variable chooses the channel, so every spec runs unchanged through the API or the browser.
+The `ACCEPTANCE_CHANNEL` environment variable chooses the channel, so every spec runs unchanged through the API or the browser.
 
 ```csharp
 using Microsoft.Playwright;
 using Xunit;
 
-public abstract class AcceptanceTest : IAsyncLifetime
+public abstract class AcceptanceTestBase : IAsyncLifetime
 {
     private static readonly string BaseUrl =
-        Environment.GetEnvironmentVariable("BASE_URL") ?? "http://localhost:4200";
-    private static readonly string Channel =
-        Environment.GetEnvironmentVariable("DRIVER") ?? "api";
+        Environment.GetEnvironmentVariable("ACCEPTANCE_BASE_URL") ?? "http://localhost:4200";
 
     private IPlaywright? _playwright;
     private IBrowser? _browser;
@@ -364,20 +375,35 @@ public abstract class AcceptanceTest : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        ITodoDriver driver;
-        if (Channel == "ui")
+        var channel = GetDriverChannel();
+        ITodoDriver driver = channel switch
         {
-            _playwright = await Playwright.CreateAsync();
-            _browser = await _playwright.Chromium.LaunchAsync();
-            var page = await _browser.NewPageAsync(new() { BaseURL = BaseUrl });
-            page.SetDefaultTimeout(5_000);
-            driver = new UiTodoDriver(page);
-        }
-        else
-        {
-            driver = new ApiTodoDriver(new HttpClient { BaseAddress = new Uri(BaseUrl) });
-        }
-        User = new UserDsl(driver, new Aliases());
+            "api" => CreateApiDriver(),
+            "ui" => await CreateUiDriver(),
+            _ => throw new InvalidOperationException(
+                $"Unknown ACCEPTANCE_CHANNEL '{channel}'. Use 'api' or 'ui'.")
+        };
+        User = new UserDsl(driver, new Alias());
+    }
+
+    private static string GetDriverChannel()
+    {
+        var channel = Environment.GetEnvironmentVariable("ACCEPTANCE_CHANNEL")?.Trim().ToLowerInvariant();
+        if (string.IsNullOrEmpty(channel))
+            throw new InvalidOperationException("Set ACCEPTANCE_CHANNEL to 'api' or 'ui' before running the acceptance tests.");
+        return channel;
+    }
+
+    private static ITodoDriver CreateApiDriver() =>
+        new ApiTodoDriver(new HttpClient { BaseAddress = new Uri(BaseUrl) });
+
+    private async Task<ITodoDriver> CreateUiDriver()
+    {
+        _playwright = await Playwright.CreateAsync();
+        _browser = await _playwright.Chromium.LaunchAsync();
+        var page = await _browser.NewPageAsync(new() { BaseURL = BaseUrl });
+        page.SetDefaultTimeout(5_000);
+        return new UiTodoDriver(page);
     }
 
     public async Task DisposeAsync()
@@ -410,8 +436,8 @@ Use three layers, because each one alone has a gap. The instructions tell the ag
   `Todo.Api.Tests` project), the Angular project's own test setup for web.
 - A task is done when all of these pass:
   1. `docker compose up -d --build`
-  2. `DRIVER=api dotnet test acceptance`
-  3. `DRIVER=ui dotnet test acceptance`
+  2. `ACCEPTANCE_CHANNEL=api dotnet test acceptance`
+  3. `ACCEPTANCE_CHANNEL=ui dotnet test acceptance`
   4. all unit tests
 ```
 
@@ -435,7 +461,7 @@ git status --porcelain acceptance/   # must print nothing
 
 Always commit your specs *before* handing work to the agent, so this check has a clean baseline. On a real team this becomes a CI step plus a `CODEOWNERS` entry; locally the habit is enough.
 
-On Windows PowerShell, set the driver with `$env:DRIVER="ui"; dotnet test acceptance` instead of the `DRIVER=ui` prefix. Commit both files.
+On Windows PowerShell, set the channel with `$env:ACCEPTANCE_CHANNEL="ui"; dotnet test acceptance` instead of the `ACCEPTANCE_CHANNEL=ui` prefix. Commit both files.
 
 ## Step 6: First loop, add a todo
 
@@ -444,13 +470,13 @@ This is the loop you'll repeat for every feature: write a spec, watch it fail, c
 **1. Write the spec** in `acceptance/Specs/AddingTodos.cs`:
 
 ```csharp
-public class AddingTodos : AcceptanceTest
+public class AddingTodos : AcceptanceTestBase
 {
     [Fact]
     public async Task UserCanAddATodo()
     {
         await User.AddTodo("Buy milk");
-        await User.ConfirmTodoShown("Buy milk");
+        await User.ConfirmTodoIsShown("Buy milk");
     }
 }
 ```
@@ -459,8 +485,8 @@ public class AddingTodos : AcceptanceTest
 
 ```bash
 docker compose up -d --build
-DRIVER=api dotnet test acceptance
-DRIVER=ui dotnet test acceptance
+ACCEPTANCE_CHANNEL=api dotnet test acceptance
+ACCEPTANCE_CHANNEL=ui dotnet test acceptance
 ```
 
 The API run should fail at `AddTodo` with "Could not add todo 'Buy milk'" and a 404 from the API. The UI run should time out looking for `new-todo-title`. If it fails anywhere else, your plumbing has a bug; fix that first.
@@ -471,7 +497,7 @@ The API run should fail at `AddTodo` with "Could not add todo 'Buy milk'" and a 
 
 ```text
 Make the failing acceptance spec UserCanAddATodo pass with both
-DRIVER=api and DRIVER=ui. Read CLAUDE.md first. The contract is in the
+ACCEPTANCE_CHANNEL=api and ACCEPTANCE_CHANNEL=ui. Read CLAUDE.md first. The contract is in the
 comments at the top of the two driver files. Keep it simple: in-memory
 storage is fine for now. Do not modify anything under acceptance/.
 ```
@@ -494,7 +520,7 @@ Add a second spec to `AddingTodos.cs`:
 public async Task CannotAddATodoWithoutATitle()
 {
     await User.AttemptToAddTodo("");
-    await User.ConfirmErrorShown("title is required");
+    await User.ConfirmErrorIsShown("title is required");
 }
 ```
 
@@ -517,14 +543,14 @@ Run the same review checklist as step 6.
 The DSL and drivers already support completing, so this one is just a spec. Create `acceptance/Specs/CompletingTodos.cs`:
 
 ```csharp
-public class CompletingTodos : AcceptanceTest
+public class CompletingTodos : AcceptanceTestBase
 {
     [Fact]
     public async Task UserCanCompleteATodo()
     {
         await User.AddTodo("Walk the dog");
         await User.CompleteTodo("Walk the dog");
-        await User.ConfirmTodoComplete("Walk the dog");
+        await User.ConfirmTodoIsComplete("Walk the dog");
     }
 }
 ```
