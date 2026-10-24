@@ -64,11 +64,11 @@ public class UiTodoDriver(IPage page) : ITodoDriver
             () => success.Or(error).First.WaitForAsync()
         );
         
-        if (!result.Succeeded)
-            return DriverResult.Failed("Timed out waiting for either success or error");
+        if (result.IsFailed)
+            return DriverResult.Fail("Timed out waiting for either success or error");
 
         return await error.IsVisibleAsync()
-            ? DriverResult.Failed(await error.InnerTextAsync())
-            : DriverResult.Ok;
+            ? DriverResult.Fail(await error.InnerTextAsync())
+            : DriverResult.Okay;
     }
 }

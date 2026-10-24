@@ -16,7 +16,7 @@ public class ApiTodoDriver(HttpClient http) : ITodoDriver
     {
         var todo = await Find(title);
         if (todo is null)
-            return DriverResult.Failed($"No todo titled '{title}'");
+            return DriverResult.Fail($"No todo titled '{title}'");
 
         return await ToResult(await http.PostAsync($"/api/todos/{todo.Id}/complete", null));
     }
@@ -29,8 +29,8 @@ public class ApiTodoDriver(HttpClient http) : ITodoDriver
 
     private static async Task<DriverResult> ToResult(HttpResponseMessage response) =>
         response.IsSuccessStatusCode
-            ? DriverResult.Ok
-            : DriverResult.Failed(await response.Content.ReadAsStringAsync());
+            ? DriverResult.Okay
+            : DriverResult.Fail(await response.Content.ReadAsStringAsync());
 
     private async Task<TodoDto?> Find(string title) =>
         (await http.GetFromJsonAsync<TodoDto[]>("/api/todos"))!

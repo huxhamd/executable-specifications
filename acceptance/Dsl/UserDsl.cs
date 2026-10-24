@@ -33,7 +33,7 @@ public class UserDsl(ITodoDriver driver, Alias alias)
     public Task ConfirmErrorIsShown(string message)
     {
         Assert.NotNull(_lastResult);
-        Assert.False(_lastResult.Succeeded, "Expected the last action to fail, but it succeeded.");
+        Assert.True(_lastResult.IsFailed, "Expected the last action to fail, but it succeeded.");
         Assert.Contains(message, _lastResult.Error, StringComparison.Ordinal);
         return Task.CompletedTask;
     }

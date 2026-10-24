@@ -1,13 +1,13 @@
 namespace acceptance.Drivers;
 
-public record DriverResult(bool Succeeded, string Error = "")
+public record DriverResult(bool IsFailed, string Error = "")
 {
-    public static readonly DriverResult Ok = new(true);
-    public static DriverResult Failed(string error) =>
-        new(false, error);
+    public static readonly DriverResult Okay = new(false);
+    public static DriverResult Fail(string error) =>
+        new(true, error);
 
     public void ShouldSucceed(string because) =>
-        Assert.True(Succeeded, $"{because}. The system said: {Error}");
+        Assert.False(IsFailed, $"{because}. The system said: {Error}");
 
 
     // Operations with no result
@@ -27,7 +27,7 @@ public record DriverResult(bool Succeeded, string Error = "")
     public static Task<DriverResult> TryCatchAsync(
         Func<Task> operation,
         Func<Exception, string?> mapException)
-        => TryCatchAsync(async () => { await operation(); return Ok; }, mapException);
+        => TryCatchAsync(async () => { await operation(); return Okay; }, mapException);
 
     // Operations that already produce a DriverResult
 
@@ -53,7 +53,7 @@ public record DriverResult(bool Succeeded, string Error = "")
         }
         catch (Exception exception) when (mapException(exception) is { } error)
         {
-            return Failed(error);
+            return Fail(error);
         }
     }
 }
