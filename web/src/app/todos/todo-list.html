@@ -1,0 +1,21 @@
+<form (submit)="add($event)">
+  <input
+    data-testid="new-todo-title"
+    aria-label="New todo"
+    [value]="newTitle()"
+    (input)="newTitle.set($any($event.target).value)"
+  />
+  <button type="submit" data-testid="add-todo">Add</button>
+</form>
+
+@if (error(); as message) {
+  <p data-testid="error-message" role="alert">{{ message }}</p>
+}
+
+<ul>
+  @for (todo of todos(); track todo.id) {
+    <li data-testid="todo-item" [attr.data-completed]="todo.completed">
+      <span data-testid="todo-title">{{ todo.title }}</span>
+    </li>
+  }
+</ul>
