@@ -13,6 +13,6 @@ public class AddingTodos : AcceptanceTestBase
     public async Task UserCannotAddATodoWithoutATitle()
     {
         await User.AttemptToAddTodo("");
-        await User.ConfirmErrorIsShown("title is required");
+        await User.ConfirmErrorIsShown("A title is required");
     }
 }
