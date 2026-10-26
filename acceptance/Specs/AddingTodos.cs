@@ -15,4 +15,12 @@ public class AddingTodos : AcceptanceTestBase
         await User.AttemptToAddTodo("");
         await User.ConfirmErrorIsShown("A title is required");
     }
+
+    [Fact]
+    public async Task UserCannotAddATodoWithATitleThatIsTooLong()
+    {
+        var longTitle = new string('a', 256); // Assuming 255 is the maximum length
+        await User.AttemptToAddTodo(longTitle);
+        await User.ConfirmErrorIsShown("The title is too long");
+    }
 }
