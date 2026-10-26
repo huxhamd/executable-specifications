@@ -30,11 +30,24 @@ public class ApiTodoDriver(HttpClient http) : ITodoDriver
     private static async Task<DriverResult> ToResult(HttpResponseMessage response) =>
         response.IsSuccessStatusCode
             ? DriverResult.Okay
-            : DriverResult.Fail(await response.Content.ReadAsStringAsync());
+            : DriverResult.Fail(await BodyOrProblem(response));
+    
+    private static async Task<string> BodyOrProblem(HttpResponseMessage response)
+    {
+        if (response.Content.Headers.ContentType?.MediaType != "application/problem+json")
+            return await response.Content.ReadAsStringAsync();
+
+        var problem = await response.Content.ReadFromJsonAsync<ProblemDto>();
+        return problem?.Errors?.Values.SelectMany(messages => messages).FirstOrDefault()
+            ?? problem?.Detail
+            ?? problem?.Title
+            ?? "";
+    }
 
     private async Task<TodoDto?> Find(string title) =>
         (await http.GetFromJsonAsync<TodoDto[]>("/api/todos"))!
             .FirstOrDefault(todo => todo.Title == title);
 
     private record TodoDto(int Id, string Title, bool Completed);
+    private record ProblemDto(string? Title, string? Detail, Dictionary<string, string[]>? Errors);
 }
