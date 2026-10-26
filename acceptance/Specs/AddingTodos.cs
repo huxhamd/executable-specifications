@@ -8,4 +8,11 @@ public class AddingTodos : AcceptanceTestBase
         await User.AddTodo("Buy milk");
         await User.ConfirmTodoIsShown("Buy milk");
     }
+    
+    [Fact]
+    public async Task UserCannotAddEmptyTodo()
+    {
+        await User.AttemptToAddTodo("");
+        await User.ConfirmErrorIsShown("title is required");
+    }
 }
