@@ -1,12 +1,23 @@
 # Working agreement
 
-- `acceptance/` holds executable specifications owned by the human.
-  Never edit, delete, skip or rename anything in it. If a spec looks
-  wrong, stop and explain why instead of working around it.
-- The drivers in `acceptance/Drivers` define the contract: API routes
-  and JSON shape, and the `data-testid` attributes the UI must expose.
-- Test-drive internal code with unit tests: xUnit for the API (add a
-  `Todo.Api.Tests` project), the Angular project's own test setup for web.
-- A task is done when all of these pass:
-  1. `pwsh -File scripts/acceptance.ps1` (rebuilds, then runs both channels)
-  2. all unit tests
+## Ownership
+- `acceptance/` and every path denied in `.claude/settings.json` are
+  owned by the human. Never modify, delete, skip or rename them. If a
+  spec looks wrong or a guardrail blocks you, stop and explain why.
+- Never commit. The human commits after review.
+- The drivers in `acceptance/Drivers` define the contract: API routes,
+  JSON shape and the UI's `data-testid` attributes.
+
+## Testing
+- Test-drive all logic: write each unit test before its code, and cover
+  every branch, boundary, invalid input and error path. Every test must
+  assert something meaningful.
+- API tests live in `api.Tests/` (`Todo.Api.Tests`); web tests use the
+  Angular project's own setup.
+- Add narrow integration tests (one component, one real dependency) for
+  persistence against a real database, framework configuration and
+  external adapters. Never re-test what acceptance specs cover.
+
+## Done
+- Implement acceptance specs with the `implement-spec` skill.
+- A task is done when `pwsh -File scripts/verify.ps1` passes.
