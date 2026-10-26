@@ -16,9 +16,17 @@ public static class TodoEndpoints
     public static Ok<IReadOnlyList<TodoItem>> List(TodoStore store) =>
         TypedResults.Ok(store.All());
 
-    public static Created<TodoItem> Create(CreateTodoRequest request, TodoStore store)
+    public static Results<Created<TodoItem>, ContentHttpResult> Create(
+        CreateTodoRequest request, TodoStore store)
     {
-        var todo = store.Add(request.Title);
+        if (string.IsNullOrWhiteSpace(request.Title))
+            return Rejected("A title is required");
+
+        var todo = store.Add(request.Title.Trim());
         return TypedResults.Created($"/api/todos/{todo.Id}", todo);
     }
+
+    // Plain text, so clients get the message as-is rather than as a JSON string.
+    private static ContentHttpResult Rejected(string message) =>
+        TypedResults.Content(message, "text/plain", statusCode: StatusCodes.Status400BadRequest);
 }
