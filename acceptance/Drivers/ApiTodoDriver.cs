@@ -4,7 +4,7 @@ namespace acceptance.Drivers;
 
 // API contract:
 //   GET    /api/todos                  -> 200 [{ id, title, completed }]
-//   POST   /api/todos                  -> 201, or 400 with a message when rejected
+//   POST   /api/todos                  -> 201, or 400 with a ProblemDetails response when rejected
 //   POST   /api/todos/{id}/complete    -> 2xx
 
 public class ApiTodoDriver(HttpClient http) : ITodoDriver
