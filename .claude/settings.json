@@ -3,7 +3,8 @@
     "deny": [
         "Edit(/acceptance/**)",
         "Edit(/.claude/settings.json)",
-        "Edit(/.claude/hooks/check-acceptance.ps1)"
+        "Edit(/scripts/check-guardrails.ps1)",
+        "Edit(/scripts/acceptance.ps1)"
     ],
     "ask": [
         "Edit(/CLAUDE.md)"
@@ -15,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File .claude/hooks/check-acceptance.ps1"
+            "command": "pwsh -NoProfile -File scripts/check-guardrails.ps1"
           }
         ]
       }
