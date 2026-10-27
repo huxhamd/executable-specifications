@@ -6,6 +6,13 @@ public class UserDsl(ITodoDriver driver, Alias alias)
 {
     private DriverResult? _lastResult;
 
+    public async Task AttemptToAddTodoWithTitleOfLength(int length)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(length, Alias.SuffixLength);
+        _lastResult = await driver.AddTodo(
+            alias.For(new string('a', length - Alias.SuffixLength)));
+    }
+
     public async Task AttemptToAddTodo(string title) =>
         _lastResult = await driver.AddTodo(alias.For(title));
 
