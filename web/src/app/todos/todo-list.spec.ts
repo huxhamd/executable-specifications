@@ -103,17 +103,37 @@ describe('TodoList', () => {
     expect(service.added).toEqual(['']);
   });
 
-  it('shows the message from a rejected add and keeps the entered title', async () => {
-    service.addResult = throwError(
-      () => new HttpErrorResponse({ status: 400, error: 'Title is required' }),
-    );
+  function rejectWith(error: unknown): void {
+    service.addResult = throwError(() => new HttpErrorResponse({ status: 400, error }));
+  }
+
+  it('shows the validation message from a rejected add and keeps the entered title', async () => {
+    rejectWith({ title: 'One or more validation errors occurred.', errors: { title: ['A title is required'] } });
     const fixture = await render();
 
     await submit(fixture, 'Buy milk');
 
-    expect(query(fixture, 'error-message')?.textContent?.trim()).toBe('Title is required');
+    expect(query(fixture, 'error-message')?.textContent?.trim()).toBe('A title is required');
     expect(titles(fixture)).toEqual([]);
     expect((query(fixture, 'new-todo-title') as HTMLInputElement).value).toBe('Buy milk');
+  });
+
+  it('shows the first validation message when there are several', async () => {
+    rejectWith({ errors: { title: ['The title is too long', 'Second'], other: ['Third'] } });
+    const fixture = await render();
+
+    await submit(fixture, 'Buy milk');
+
+    expect(query(fixture, 'error-message')?.textContent?.trim()).toBe('The title is too long');
+  });
+
+  it('skips fields with no messages', async () => {
+    rejectWith({ errors: { title: [], other: ['The title is too long'] } });
+    const fixture = await render();
+
+    await submit(fixture, 'Buy milk');
+
+    expect(query(fixture, 'error-message')?.textContent?.trim()).toBe('The title is too long');
   });
 
   it('shows a fallback message when a failed add has no message', async () => {
@@ -124,6 +144,23 @@ describe('TodoList', () => {
 
     expect(query(fixture, 'error-message')?.textContent?.trim()).toBe('Could not add todo');
   });
+
+  for (const [description, error] of [
+    ['a plain text body', 'Title is required'],
+    ['no errors', { title: 'Bad Request' }],
+    ['empty errors', { errors: {} }],
+    ['errors that are not lists', { errors: { title: 'A title is required' } }],
+    ['messages that are not text', { errors: { title: [42, ''] } }],
+  ] as const) {
+    it(`shows a fallback message when a rejection has ${description}`, async () => {
+      rejectWith(error);
+      const fixture = await render();
+
+      await submit(fixture, 'Buy milk');
+
+      expect(query(fixture, 'error-message')?.textContent?.trim()).toBe('Could not add todo');
+    });
+  }
 
   it('clears the error after a successful add', async () => {
     service.addResult = throwError(() => new HttpErrorResponse({ status: 500 }));

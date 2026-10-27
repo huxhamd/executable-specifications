@@ -32,8 +32,12 @@ export class TodoList {
   }
 }
 
+// Rejections are ValidationProblemDetails: { errors: { "<field>": ["<message>", ...] } }.
 function messageFrom(response: HttpErrorResponse): string {
-  return typeof response.error === 'string' && response.error
-    ? response.error
-    : 'Could not add todo';
+  const errors: unknown = response.error?.errors;
+  const messages =
+    errors && typeof errors === 'object'
+      ? Object.values(errors).flatMap((field) => (Array.isArray(field) ? field : []))
+      : [];
+  return messages.find((message) => typeof message === 'string' && message) ?? 'Could not add todo';
 }

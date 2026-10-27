@@ -16,17 +16,21 @@ public static class TodoEndpoints
     public static Ok<IReadOnlyList<TodoItem>> List(TodoStore store) =>
         TypedResults.Ok(store.All());
 
-    public static Results<Created<TodoItem>, ContentHttpResult> Create(
+    public const int MaxTitleLength = 255;
+
+    public static Results<Created<TodoItem>, ValidationProblem> Create(
         CreateTodoRequest request, TodoStore store)
     {
-        if (string.IsNullOrWhiteSpace(request.Title))
-            return Rejected("A title is required");
+        var title = request.Title?.Trim();
+        if (string.IsNullOrEmpty(title))
+            return InvalidTitle("A title is required");
+        if (title.Length > MaxTitleLength)
+            return InvalidTitle("The title is too long");
 
-        var todo = store.Add(request.Title.Trim());
+        var todo = store.Add(title);
         return TypedResults.Created($"/api/todos/{todo.Id}", todo);
     }
 
-    // Plain text, so clients get the message as-is rather than as a JSON string.
-    private static ContentHttpResult Rejected(string message) =>
-        TypedResults.Content(message, "text/plain", statusCode: StatusCodes.Status400BadRequest);
+    private static ValidationProblem InvalidTitle(string message) =>
+        TypedResults.ValidationProblem(new Dictionary<string, string[]> { ["title"] = [message] });
 }

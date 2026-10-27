@@ -17,7 +17,7 @@ public class AddingTodos : AcceptanceTestBase
     }
 
     [Fact]
-    public async Task UserCannotAddATodoWithATitleLongerThan255Characters()
+    public async Task UserCannotAddATodoWithATitleLongerThan255Utf16Characters()
     {
         await User.AttemptToAddTodoWithTitleOfLength(256);
         await User.ConfirmErrorIsShown("The title is too long");

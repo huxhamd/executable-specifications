@@ -45,10 +45,49 @@ public class TodoEndpointsTests
     {
         var result = TodoEndpoints.Create(new CreateTodoRequest(title!), _store);
 
-        var rejection = Assert.IsType<ContentHttpResult>(result.Result);
+        AssertRejectedTitle(result, "A title is required");
+    }
+
+    [Fact]
+    public void CreateAcceptsATitleOfTheMaximumLength()
+    {
+        var title = new string('a', TodoEndpoints.MaxTitleLength);
+
+        var result = TodoEndpoints.Create(new CreateTodoRequest(title), _store);
+
+        Assert.IsType<Created<TodoItem>>(result.Result);
+        Assert.Equal(title, Assert.Single(_store.All()).Title);
+    }
+
+    [Fact]
+    public void CreateRejectsATitleLongerThanTheMaximumLength()
+    {
+        var title = new string('a', TodoEndpoints.MaxTitleLength + 1);
+
+        var result = TodoEndpoints.Create(new CreateTodoRequest(title), _store);
+
+        AssertRejectedTitle(result, "The title is too long");
+    }
+
+    [Fact]
+    public void CreateMeasuresTheTitleLengthAfterTrimming()
+    {
+        var title = new string('a', TodoEndpoints.MaxTitleLength);
+
+        var result = TodoEndpoints.Create(new CreateTodoRequest($"  {title}\n"), _store);
+
+        Assert.IsType<Created<TodoItem>>(result.Result);
+        Assert.Equal(title, Assert.Single(_store.All()).Title);
+    }
+
+    private void AssertRejectedTitle(
+        Results<Created<TodoItem>, ValidationProblem> result, string message)
+    {
+        var rejection = Assert.IsType<ValidationProblem>(result.Result);
         Assert.Equal(StatusCodes.Status400BadRequest, rejection.StatusCode);
-        Assert.Equal("text/plain", rejection.ContentType);
-        Assert.Equal("A title is required", rejection.ResponseContent);
+        var (field, messages) = Assert.Single(rejection.ProblemDetails.Errors);
+        Assert.Equal("title", field);
+        Assert.Equal([message], messages);
         Assert.Empty(_store.All());
     }
 
