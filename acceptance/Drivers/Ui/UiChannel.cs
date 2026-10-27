@@ -1,6 +1,6 @@
 using Microsoft.Playwright;
 
-namespace acceptance.Drivers;
+namespace acceptance.Drivers.Ui;
 
 // Every UI capability drives the same page, so they share one browser session.
 public class UiChannel(IPage page) : IChannel

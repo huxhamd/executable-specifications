@@ -1,3 +1,5 @@
+using acceptance.Infrastructure;
+
 namespace acceptance.Specs;
 
 public class AddingTodos : AcceptanceTestBase

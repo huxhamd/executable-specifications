@@ -1,7 +1,7 @@
 using System.Reflection;
 using Xunit.v3;
 
-namespace acceptance;
+namespace acceptance.Infrastructure;
 
 // Limits a spec to the channels it applies to: [Fact, Channels(Channel.Ui)].
 // Specs without it run on every channel, which should stay the default.

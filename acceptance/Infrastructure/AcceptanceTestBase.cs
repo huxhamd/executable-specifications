@@ -1,7 +1,10 @@
 using Microsoft.Playwright;
-using acceptance;
 using acceptance.Dsl;
 using acceptance.Drivers;
+using acceptance.Drivers.Api;
+using acceptance.Drivers.Ui;
+
+namespace acceptance.Infrastructure;
 
 public abstract class AcceptanceTestBase : IAsyncLifetime
 {

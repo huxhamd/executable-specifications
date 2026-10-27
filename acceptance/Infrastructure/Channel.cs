@@ -1,4 +1,4 @@
-namespace acceptance;
+namespace acceptance.Infrastructure;
 
 public enum Channel { Api, Ui }
 

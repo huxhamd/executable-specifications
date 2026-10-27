@@ -1,4 +1,4 @@
-namespace acceptance.Drivers;
+namespace acceptance.Drivers.Api;
 
 public class ApiChannel(HttpClient http) : IChannel
 {
