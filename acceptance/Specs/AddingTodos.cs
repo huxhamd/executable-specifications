@@ -22,4 +22,11 @@ public class AddingTodos : AcceptanceTestBase
         await User.AttemptToAddTodoWithTitleOfLength(256);
         await User.ConfirmErrorIsShown("The title is too long");
     }
+
+    [Fact, Channels(Channel.Ui)]
+    public async Task UserIsWarnedWhileTypingATitleLongerThan255Utf16Characters()
+    {
+        await User.TypeTodoTitleOfLength(256);
+        await User.ConfirmWarnedTitleIsTooLong();
+    }
 }

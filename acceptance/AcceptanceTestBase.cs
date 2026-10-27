@@ -1,4 +1,5 @@
 using Microsoft.Playwright;
+using acceptance;
 using acceptance.Dsl;
 using acceptance.Drivers;
 
@@ -12,42 +13,30 @@ public abstract class AcceptanceTestBase : IAsyncLifetime
 
     protected UserDsl User { get; private set; } = null!;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
-        var channel = GetDriverChannel();
-        ITodoDriver driver = channel switch
+        IChannel channel = AcceptanceChannel.Current switch
         {
-            "api" => CreateApiDriver(),
-            "ui" => await CreateUiDriver(),
-            _ => throw new InvalidOperationException(
-                $"Unknown ACCEPTANCE_CHANNEL '{channel}'. Use 'api' or 'ui'.")
+            Channel.Api => CreateApiChannel(),
+            Channel.Ui => await CreateUiChannel(),
+            var other => throw new InvalidOperationException($"No channel set up for {other}.")
         };
-        User = new UserDsl(driver, new Alias());
+        User = new UserDsl(channel, new Alias());
     }
 
-    private static string GetDriverChannel()
-    {
-        var channel = Environment
-            .GetEnvironmentVariable("ACCEPTANCE_CHANNEL")
-            ?.Trim().ToLowerInvariant();
-        if (string.IsNullOrEmpty(channel)) throw new InvalidOperationException(
-            "Set ACCEPTANCE_CHANNEL to 'api' or 'ui' before running the acceptance tests.");
-        return channel;
-    }
+    private static IChannel CreateApiChannel() =>
+        new ApiChannel(new HttpClient { BaseAddress = new Uri(BaseUrl) });
 
-    private static ITodoDriver CreateApiDriver() =>
-        new ApiTodoDriver(new HttpClient { BaseAddress = new Uri(BaseUrl) });
-
-    private async Task<ITodoDriver> CreateUiDriver()
+    private async Task<IChannel> CreateUiChannel()
     {
         _playwright = await Playwright.CreateAsync();
         _browser = await _playwright.Chromium.LaunchAsync();
         var page = await _browser.NewPageAsync(new() { BaseURL = BaseUrl });
         page.SetDefaultTimeout(5_000);
-        return new UiTodoDriver(page);
+        return new UiChannel(page);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_browser is not null) await _browser.CloseAsync();
         _playwright?.Dispose();
