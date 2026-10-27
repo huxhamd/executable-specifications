@@ -34,7 +34,7 @@ public class UserDsl(ITodoDriver driver, Alias alias)
     {
         Assert.NotNull(_lastResult);
         Assert.True(_lastResult.IsFailed, "Expected the last action to fail, but it succeeded.");
-        Assert.Contains(message, _lastResult.Error, StringComparison.Ordinal);
+        Assert.Equal(message, _lastResult.Error);
         return Task.CompletedTask;
     }
 }
