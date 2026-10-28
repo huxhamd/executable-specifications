@@ -1,4 +1,4 @@
-docker compose up -d --build
+docker compose up -d --build --force-recreate
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 $failed = @()
