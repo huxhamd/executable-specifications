@@ -784,7 +784,7 @@ The working agreement, at the repo root. Claude Code reads it at the start of ev
 
 ## Done
 - Implement acceptance specs with the `implement-spec` skill.
-- A task is done when `pwsh -File scripts/verify.ps1` passes.
+- A task is done when `pwsh -File scripts/check-done.ps1` passes.
 ```
 
 **`.claude/settings.json`**
@@ -800,10 +800,10 @@ The two hooks catch anything the deny rules miss, such as a shell command, as so
         "Edit(/acceptance/**)",
         "Edit(/.claude/settings.json)",
         "Edit(/.claude/skills/implement-spec/**)",
-        "Edit(/scripts/acceptance.ps1)",
-        "Edit(/scripts/check-guardrails.ps1)",
-        "Edit(/scripts/preflight.ps1)",
-        "Edit(/scripts/verify.ps1)"
+        "Edit(/scripts/run-acceptance-tests.ps1)",
+        "Edit(/scripts/check-protected-files.ps1)",
+        "Edit(/scripts/check-ready-to-implement.ps1)",
+        "Edit(/scripts/check-done.ps1)"
     ],
     "ask": [
         "Edit(/CLAUDE.md)"
@@ -815,7 +815,7 @@ The two hooks catch anything the deny rules miss, such as a shell command, as so
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File scripts/check-guardrails.ps1 -Record"
+            "command": "pwsh -NoProfile -File scripts/check-protected-files.ps1 -Record"
           }
         ]
       }
@@ -825,7 +825,7 @@ The two hooks catch anything the deny rules miss, such as a shell command, as so
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File scripts/check-guardrails.ps1 -SinceRecord"
+            "command": "pwsh -NoProfile -File scripts/check-protected-files.ps1 -SinceRecord"
           }
         ]
       }
@@ -834,17 +834,17 @@ The two hooks catch anything the deny rules miss, such as a shell command, as so
 }
 ```
 
-**`scripts/check-guardrails.ps1`**
+**`scripts/check-protected-files.ps1`**
 
-The real lock, in three modes. With no switch it fails on *any* uncommitted change to a protected path; `verify.ps1` uses this, so nothing reaches a commit unreviewed. `-Record` and `-SinceRecord` are the two hooks. The record lives in the `.git` folder, one file per session, so it is never committed.
+The real lock, in three modes. With no switch it fails on *any* uncommitted change to a protected path; `check-done.ps1` uses this, so nothing reaches a commit unreviewed. `-Record` and `-SinceRecord` are the two hooks. The record lives in the `.git` folder, one file per session, so it is never committed.
 
-When the agent has changed a protected file, exit code 2 blocks it from finishing and shows it the message. Files you had already changed get different instructions, so the agent never discards your work with `git restore`. If the agent still hasn't put things right when it next tries to finish, the hook lets the turn end rather than loop, and shows *you* a warning instead. The strict check in `verify.ps1` still fails until it's resolved.
+When the agent has changed a protected file, exit code 2 blocks it from finishing and shows it the message. Files you had already changed get different instructions, so the agent never discards your work with `git restore`. If the agent still hasn't put things right when it next tries to finish, the hook lets the turn end rather than loop, and shows *you* a warning instead. The strict check in `check-done.ps1` still fails until it's resolved.
 
 ```powershell
 # Checks that nothing the agent must not change has changed.
 #
 #   (no switch)    Fails if any protected path differs from the last commit.
-#                  Used by verify.ps1: the human's definition of done.
+#                  Used by check-done.ps1: the human's definition of done.
 #   -Record        UserPromptSubmit hook. Records the protected paths' current
 #                  state for this session, so the Stop hook can tell what the
 #                  agent changed during the turn. Prints nothing: a
@@ -861,10 +861,10 @@ $protected = @(
     "acceptance/",
     ".claude/settings.json",
     ".claude/skills/implement-spec/",
-    "scripts/acceptance.ps1",
-    "scripts/check-guardrails.ps1",
-    "scripts/preflight.ps1",
-    "scripts/verify.ps1"
+    "scripts/run-acceptance-tests.ps1",
+    "scripts/check-protected-files.ps1",
+    "scripts/check-ready-to-implement.ps1",
+    "scripts/check-done.ps1"
 )
 
 Set-Location (git rev-parse --show-toplevel)
@@ -883,7 +883,7 @@ function Get-ProtectedState {
 }
 
 function Get-RecordPath([string]$sessionId) {
-    $folder = git rev-parse --git-path claude-guardrails
+    $folder = git rev-parse --git-path claude-protected-files
     New-Item -ItemType Directory -Force -Path $folder | Out-Null
     $safeId = $sessionId -replace '[^A-Za-z0-9_-]', '_'
     Join-Path $folder "$safeId.json"
@@ -907,7 +907,7 @@ if (-not $SinceRecord) {
             "Protected files have uncommitted changes:`n$($current.Keys -join "`n")")
         exit 1
     }
-    Write-Host "Guardrails intact: no protected files have changed."
+    Write-Host "Protected files intact: none have changed."
     exit 0
 }
 
@@ -925,7 +925,7 @@ if (-not $changed) { exit 0 }
 $list = $changed -join "`n"
 if ($hookInput.stop_hook_active) {
     # Already asked once. Let the turn end rather than loop, and warn the human.
-    @{ systemMessage = "Guardrails: protected files changed during this turn and were not restored:`n$list" } |
+    @{ systemMessage = "Protected files changed during this turn and were not restored:`n$list" } |
         ConvertTo-Json -Compress
     exit 0
 }
@@ -948,7 +948,7 @@ $message += "`n`nThen stop and explain why you needed to change them."
 exit 2
 ```
 
-**`scripts/acceptance.ps1`**
+**`scripts/run-acceptance-tests.ps1`**
 
 Deploys the system and runs every spec through each channel in turn. `--force-recreate` gives every run fresh containers, so data doesn't build up across runs. Within a run, both channels share the same system, which is fine because aliasing keeps specs apart.
 
@@ -972,9 +972,9 @@ if ($failed) {
 Write-Host "`nAll channels passed" -ForegroundColor Green
 ```
 
-**`scripts/verify.ps1`**
+**`scripts/check-done.ps1`**
 
-The definition of done: guardrails, all unit tests and all acceptance tests, with a summary at the end. The agent's task is finished only when this passes, and so is your review.
+The definition of done: the protected-files check, all unit tests and all acceptance tests, with a summary at the end. The agent's task is finished only when this passes, and so is your review.
 
 ```powershell
 $results = [ordered]@{}
@@ -985,10 +985,10 @@ function Invoke-Check([string]$name, [scriptblock]$check) {
     $results[$name] = ($LASTEXITCODE -eq 0)
 }
 
-Invoke-Check "Guardrails"       { pwsh -NoProfile -File scripts/check-guardrails.ps1 }
+Invoke-Check "Protected files"  { pwsh -NoProfile -File scripts/check-protected-files.ps1 }
 Invoke-Check "API unit tests"   { dotnet test api.Tests }
 Invoke-Check "Web unit tests"   { Push-Location web; npx ng test --watch=false; Pop-Location }
-Invoke-Check "Acceptance tests" { pwsh -NoProfile -File scripts/acceptance.ps1 }
+Invoke-Check "Acceptance tests" { pwsh -NoProfile -File scripts/run-acceptance-tests.ps1 }
 
 Write-Host "`n=== Summary ===`n"
 foreach ($entry in $results.GetEnumerator()) {
@@ -1000,7 +1000,7 @@ if ($results.Values -contains $false) { exit 1 }
 Write-Host "`nVerified: all checks passed." -ForegroundColor Green
 ```
 
-**`scripts/preflight.ps1`**
+**`scripts/check-ready-to-implement.ps1`**
 
 Checks the starting point before the agent begins: the working tree is clean, and the spec it was asked to implement is committed. A clean start means the agent's diff contains only its own work. The spec is found by name in the committed files, so it doesn't matter how many commits you've made since writing it.
 
@@ -1011,7 +1011,7 @@ param([string]$Spec)
 
 # Not a mandatory parameter: PowerShell would prompt for it, which an agent can't answer.
 if (-not $Spec) {
-    [Console]::Error.WriteLine("Usage: pwsh -File scripts/preflight.ps1 -Spec <SpecMethodName>")
+    [Console]::Error.WriteLine("Usage: pwsh -File scripts/check-ready-to-implement.ps1 -Spec <SpecMethodName>")
     exit 1
 }
 
@@ -1032,12 +1032,12 @@ if (-not $found) {
     exit 1
 }
 
-Write-Host "Preflight passed. Target spec:`n$found"
+Write-Host "Ready to implement. Target spec:`n$found"
 ```
 
 **`.claude/skills/implement-spec/SKILL.md`**
 
-A Claude Code skill: the agent's procedure for making a failing spec pass. It runs the preflight for the spec you named, confirms the spec fails for the right reason, implements to the definition of done in `CLAUDE.md`, and says when to stop and ask rather than push on. You start it with `/implement-spec <SpecName>`.
+A Claude Code skill: the agent's procedure for making a failing spec pass. It runs the readiness check for the spec you named, confirms the spec fails for the right reason, implements to the definition of done in `CLAUDE.md`, and says when to stop and ask rather than push on. You start it with `/implement-spec <SpecName>`.
 
 ```markdown
 ---
@@ -1058,16 +1058,16 @@ human.
 
 When you stop, leave your changes uncommitted for the human to review.
 Before reporting, check that the API and web projects still build and
-that `pwsh -File scripts/check-guardrails.ps1` passes. If your latest
+that `pwsh -File scripts/check-protected-files.ps1` passes. If your latest
 change broke the build, undo that change only.
 
 ## Steps
 1. Identify the target spec: the spec method named in the request. If none
    is named, stop and ask which one. Run
-   `pwsh -File scripts/preflight.ps1 -Spec <SpecName>`. If it fails, stop and
+   `pwsh -File scripts/check-ready-to-implement.ps1 -Spec <SpecName>`. If it fails, stop and
    report its output.
 2. Read the target spec and the contract comments in the driver files.
-3. Run `pwsh -File scripts/acceptance.ps1`. Confirm the target spec fails
+3. Run `pwsh -File scripts/run-acceptance-tests.ps1`. Confirm the target spec fails
    because the behaviour is missing, not because of broken plumbing.
    If it fails for any other reason, or already passes, stop and report.
 4. Implement in small steps, following the testing rules in CLAUDE.md,
@@ -1110,7 +1110,7 @@ public class AddingTodos : AcceptanceTestBase
 **2. Watch it fail, for the right reason.** Deploy the system and run both channels:
 
 ```bash
-pwsh -File scripts/acceptance.ps1
+pwsh -File scripts/run-acceptance-tests.ps1
 ```
 
 The API run should fail at `AddTodo` with "Could not add todo 'Buy milk'" and a 404 from the API. The UI run should time out looking for `new-todo-title`. If it fails anywhere else, your plumbing has a bug; fix that first.
@@ -1128,7 +1128,7 @@ The skill and `CLAUDE.md` already tell it where the contract lives, what it may 
 
 **5. Review.**
 
-- [ ] `pwsh -File scripts/verify.ps1` passes when you run it yourself, not just when the agent says so. It includes the guardrail check.
+- [ ] `pwsh -File scripts/check-done.ps1` passes when you run it yourself, not just when the agent says so. It includes the protected-files check.
 - [ ] The agent added unit tests in the API and web projects
 - [ ] The diff is something you'd accept from a colleague
 
@@ -1147,7 +1147,7 @@ public async Task CannotAddATodoWithoutATitle()
 }
 ```
 
-Run `pwsh -File scripts/acceptance.ps1`. Right now the app probably accepts blank titles, so expect "Expected the last action to fail, but it succeeded." on both. In the UI run, the driver spotted a todo with an empty title appearing. That's the exact-match locator doing its job.
+Run `pwsh -File scripts/run-acceptance-tests.ps1`. Right now the app probably accepts blank titles, so expect "Expected the last action to fail, but it succeeded." on both. In the UI run, the driver spotted a todo with an empty title appearing. That's the exact-match locator doing its job.
 
 Note that `"A title is required"` pins the exact wording on purpose. The API must return it in the 400 body's `errors`, as the API driver's contract describes, and the UI must show it in `error-message`. If you'd rather not fix the wording, make the DSL method check only that *some* error was shown.
 
@@ -1226,11 +1226,11 @@ If a spec breaks during 1 or 2, look at why. It usually means the spec or driver
 | UI driver times out at the add button | The agent disabled the button for blank input; the contract says it stays enabled |
 | UI tests pass but the API channel fails | Logic lives only in Angular; validation must also be in the API |
 | Playwright says no browser is installed | Re-run the `playwright.ps1 install chromium` step after any package upgrade |
-| Old behaviour after the agent's changes | You started the stack by hand without `--build`; `scripts/acceptance.ps1` always rebuilds |
+| Old behaviour after the agent's changes | You started the stack by hand without `--build`; `scripts/run-acceptance-tests.ps1` always rebuilds |
 | A spec is reported as skipped | It's limited to other channels with `[Channels(...)]`, which is expected |
-| `preflight.ps1` fails | Commit everything, including the spec, and name the spec method exactly |
+| `check-ready-to-implement.ps1` fails | Commit everything, including the spec, and name the spec method exactly |
 | The agent is told it changed protected files | It changed one during its turn, perhaps through a shell command; it should undo that and explain why |
-| A "Guardrails" warning appears when the agent finishes | The agent didn't undo a protected change after being told; review the diff and revert it yourself |
+| A "Protected files changed" warning appears when the agent finishes | The agent didn't undo a protected change after being told; review the diff and revert it yourself |
 
 ## Questions to reflect on
 
