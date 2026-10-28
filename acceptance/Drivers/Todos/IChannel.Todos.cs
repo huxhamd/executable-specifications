@@ -1,8 +1,8 @@
-namespace acceptance.Drivers.Todos;
+using acceptance.Drivers.Todos;
 
-// The capabilities one channel offers. Each is a small driver of its own.
-// Required capabilities have no default; optional ones default to null,
-// meaning "not supported", so a channel only names what it can do.
+// Part of IChannel (see Drivers/Channels/IChannel.cs), so it shares that namespace.
+namespace acceptance.Drivers.Channels;
+
 public partial interface IChannel
 {
     ITodoDriver Todos { get; }
