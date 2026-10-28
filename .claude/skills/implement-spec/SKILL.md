@@ -20,7 +20,10 @@ that `pwsh -File scripts/check-guardrails.ps1` passes. If your latest
 change broke the build, undo that change only.
 
 ## Steps
-1. Run `pwsh -File scripts/preflight.ps1`. If it fails, stop and report its output.
+1. Identify the target spec: the spec method named in the request. If none
+   is named, stop and ask which one. Run
+   `pwsh -File scripts/preflight.ps1 -Spec <SpecName>`. If it fails, stop and
+   report its output.
 2. Read the target spec and the contract comments in the driver files.
 3. Run `pwsh -File scripts/acceptance.ps1`. Confirm the target spec fails
    because the behaviour is missing, not because of broken plumbing.
