@@ -1,7 +1,7 @@
 # Checks that nothing the agent must not change has changed.
 #
 #   (no switch)    Fails if any protected path differs from the last commit.
-#                  Used by verify.ps1: the human's definition of done.
+#                  Used by check-done.ps1: the human's definition of done.
 #   -Record        UserPromptSubmit hook. Records the protected paths' current
 #                  state for this session, so the Stop hook can tell what the
 #                  agent changed during the turn. Prints nothing: a
@@ -18,10 +18,10 @@ $protected = @(
     "acceptance/",
     ".claude/settings.json",
     ".claude/skills/implement-spec/",
-    "scripts/acceptance.ps1",
-    "scripts/check-guardrails.ps1",
-    "scripts/preflight.ps1",
-    "scripts/verify.ps1"
+    "scripts/run-acceptance-tests.ps1",
+    "scripts/check-protected-files.ps1",
+    "scripts/check-ready-to-implement.ps1",
+    "scripts/check-done.ps1"
 )
 
 Set-Location (git rev-parse --show-toplevel)
@@ -40,7 +40,7 @@ function Get-ProtectedState {
 }
 
 function Get-RecordPath([string]$sessionId) {
-    $folder = git rev-parse --git-path claude-guardrails
+    $folder = git rev-parse --git-path claude-protected-files
     New-Item -ItemType Directory -Force -Path $folder | Out-Null
     $safeId = $sessionId -replace '[^A-Za-z0-9_-]', '_'
     Join-Path $folder "$safeId.json"
@@ -64,7 +64,7 @@ if (-not $SinceRecord) {
             "Protected files have uncommitted changes:`n$($current.Keys -join "`n")")
         exit 1
     }
-    Write-Host "Guardrails intact: no protected files have changed."
+    Write-Host "Protected files intact: none have changed."
     exit 0
 }
 
@@ -82,7 +82,7 @@ if (-not $changed) { exit 0 }
 $list = $changed -join "`n"
 if ($hookInput.stop_hook_active) {
     # Already asked once. Let the turn end rather than loop, and warn the human.
-    @{ systemMessage = "Guardrails: protected files changed during this turn and were not restored:`n$list" } |
+    @{ systemMessage = "Protected files changed during this turn and were not restored:`n$list" } |
         ConvertTo-Json -Compress
     exit 0
 }

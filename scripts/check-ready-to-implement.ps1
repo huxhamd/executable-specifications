@@ -4,7 +4,7 @@ param([string]$Spec)
 
 # Not a mandatory parameter: PowerShell would prompt for it, which an agent can't answer.
 if (-not $Spec) {
-    [Console]::Error.WriteLine("Usage: pwsh -File scripts/preflight.ps1 -Spec <SpecMethodName>")
+    [Console]::Error.WriteLine("Usage: pwsh -File scripts/check-ready-to-implement.ps1 -Spec <SpecMethodName>")
     exit 1
 }
 
@@ -25,4 +25,4 @@ if (-not $found) {
     exit 1
 }
 
-Write-Host "Preflight passed. Target spec:`n$found"
+Write-Host "Ready to implement. Target spec:`n$found"

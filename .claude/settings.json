@@ -4,10 +4,10 @@
         "Edit(/acceptance/**)",
         "Edit(/.claude/settings.json)",
         "Edit(/.claude/skills/implement-spec/**)",
-        "Edit(/scripts/acceptance.ps1)",
-        "Edit(/scripts/check-guardrails.ps1)",
-        "Edit(/scripts/preflight.ps1)",
-        "Edit(/scripts/verify.ps1)"
+        "Edit(/scripts/run-acceptance-tests.ps1)",
+        "Edit(/scripts/check-protected-files.ps1)",
+        "Edit(/scripts/check-ready-to-implement.ps1)",
+        "Edit(/scripts/check-done.ps1)"
     ],
     "ask": [
         "Edit(/CLAUDE.md)"
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File scripts/check-guardrails.ps1 -Record"
+            "command": "pwsh -NoProfile -File scripts/check-protected-files.ps1 -Record"
           }
         ]
       }
@@ -29,7 +29,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File scripts/check-guardrails.ps1 -SinceRecord"
+            "command": "pwsh -NoProfile -File scripts/check-protected-files.ps1 -SinceRecord"
           }
         ]
       }

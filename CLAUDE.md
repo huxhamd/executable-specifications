@@ -20,4 +20,4 @@
 
 ## Done
 - Implement acceptance specs with the `implement-spec` skill.
-- A task is done when `pwsh -File scripts/verify.ps1` passes.
+- A task is done when `pwsh -File scripts/check-done.ps1` passes.
