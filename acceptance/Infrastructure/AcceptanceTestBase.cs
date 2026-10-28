@@ -1,8 +1,6 @@
 using Microsoft.Playwright;
 using acceptance.Dsl;
-using acceptance.Drivers;
-using acceptance.Drivers.Api;
-using acceptance.Drivers.Ui;
+using acceptance.Drivers.Todos;
 
 namespace acceptance.Infrastructure;
 
