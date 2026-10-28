@@ -1,20 +1,25 @@
 using acceptance.Drivers;
+using acceptance.Drivers.Channels;
+using acceptance.Drivers.Todos;
 
 namespace acceptance.Dsl;
 
-public class UserDsl(ITodoDriver driver, Alias alias)
+public class UserDsl(IChannel channel, Alias alias)
 {
     private DriverResult? _lastResult;
 
-    public async Task AttemptToAddTodoWithTitleOfLength(int length)
-    {
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(length, Alias.SuffixLength);
-        _lastResult = await driver.AddTodo(
-            alias.For(new string('a', length - Alias.SuffixLength)));
-    }
+    private ITodoDriver Todos => channel.Todos;
 
-    public async Task AttemptToAddTodo(string title) =>
-        _lastResult = await driver.AddTodo(alias.For(title));
+    private ITodoTextInputDriver TextInput => channel.TextInput
+        ?? throw new InvalidOperationException(
+            "This spec uses live text input, which this channel does not support. " +
+            "Limit it to the channels that do, e.g. [Fact, Channels(Channel.Ui)].");
+
+    public Task AttemptToAddTodoWithTitleOfLength(int length) =>
+        AttemptToAddAliasedTodo(AliasedTitleOfLength(length));
+
+    public Task AttemptToAddTodo(string title) =>
+        AttemptToAddAliasedTodo(alias.For(title));
 
     public async Task AddTodo(string title)
     {
@@ -23,7 +28,7 @@ public class UserDsl(ITodoDriver driver, Alias alias)
     }
 
     public async Task AttemptToCompleteTodo(string title) =>
-        _lastResult = await driver.CompleteTodo(alias.For(title));
+        _lastResult = await Todos.CompleteTodo(alias.For(title));
 
     public async Task CompleteTodo(string title)
     {
@@ -32,10 +37,10 @@ public class UserDsl(ITodoDriver driver, Alias alias)
     }
 
     public Task ConfirmTodoIsShown(string title) =>
-        driver.ConfirmTodoIsShown(alias.For(title));
+        Todos.ConfirmTodoIsShown(alias.For(title));
 
     public Task ConfirmTodoIsComplete(string title) =>
-        driver.ConfirmTodoIsComplete(alias.For(title));
+        Todos.ConfirmTodoIsComplete(alias.For(title));
 
     public Task ConfirmErrorIsShown(string message)
     {
@@ -43,5 +48,25 @@ public class UserDsl(ITodoDriver driver, Alias alias)
         Assert.True(_lastResult.IsFailed, "Expected the last action to fail, but it succeeded.");
         Assert.Equal(message, _lastResult.Error);
         return Task.CompletedTask;
+    }
+
+    // Live text input
+
+    public Task TypeTodoTitleOfLength(int length) =>
+        TextInput.TypeTodoTitle(AliasedTitleOfLength(length));
+
+    public Task ConfirmWarnedTitleIsTooLong() =>
+        TextInput.ConfirmTitleTooLongWarningIsShown();
+
+    // Helpers
+
+    private async Task AttemptToAddAliasedTodo(string aliasedTitle) =>
+        _lastResult = await Todos.AddTodo(aliasedTitle);
+
+    // The alias suffix counts towards the length, so the system sees exactly `length` characters.
+    private string AliasedTitleOfLength(int length)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(length, Alias.SuffixLength);
+        return alias.For(new string('a', length - Alias.SuffixLength));
     }
 }

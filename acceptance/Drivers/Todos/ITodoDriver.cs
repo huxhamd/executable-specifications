@@ -1,4 +1,4 @@
-namespace acceptance.Drivers;
+namespace acceptance.Drivers.Todos;
 
 public interface ITodoDriver
 {
