@@ -952,7 +952,45 @@ exit 2
 
 Deploys the system and runs every spec through each channel in turn. `--force-recreate` gives every run fresh containers, so data doesn't build up across runs. Within a run, both channels share the same system, which is fine because aliasing keeps specs apart.
 
+If Docker isn't running, the script starts Docker Desktop with its CLI (`docker desktop start`) and waits for the engine to accept commands. If it can't, it stops with a plain message rather than failing partway through, so an agent reports it as an environment problem instead of debugging your code. To avoid the wait altogether, turn on *Start Docker Desktop when you sign in* in Docker Desktop's general settings.
+
 ```powershell
+# Deploys the system in fresh containers and runs every spec through each channel.
+
+# Docker must be running first. If it isn't, try to start Docker Desktop and wait for it.
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    [Console]::Error.WriteLine("Docker isn't installed, or isn't on the PATH.")
+    exit 1
+}
+
+function Test-DockerRunning {
+    docker info *> $null
+    $LASTEXITCODE -eq 0
+}
+
+if (-not (Test-DockerRunning)) {
+    $waitSeconds = 120
+    Write-Host "Docker isn't running. Starting Docker Desktop (waiting up to $waitSeconds seconds)..."
+    # --detach returns at once; Docker is ready only when `docker info` succeeds.
+    docker desktop start --detach *> $null
+    if ($LASTEXITCODE -ne 0) {
+        # No Docker Desktop CLI: an older Docker Desktop, or Docker Engine without Desktop.
+        [Console]::Error.WriteLine(
+            "Docker isn't running and Docker Desktop couldn't be started from here. Start Docker, then run this again.")
+        exit 1
+    }
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    while (-not (Test-DockerRunning) -and $timer.Elapsed.TotalSeconds -lt $waitSeconds) {
+        Start-Sleep -Seconds 3
+    }
+    if (-not (Test-DockerRunning)) {
+        [Console]::Error.WriteLine(
+            "Docker isn't running and couldn't be started. Start Docker Desktop, then run this again.")
+        exit 1
+    }
+    Write-Host "Docker is running."
+}
+
 docker compose up -d --build --force-recreate
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -1222,6 +1260,8 @@ If a spec breaks during 1 or 2, look at why. It usually means the spec or driver
 
 | Symptom | Likely cause |
 | --- | --- |
+| "Docker isn't running and couldn't be started" | Start Docker Desktop yourself; it may need an update or a sign-in prompt answered |
+| "Docker Desktop couldn't be started from here" | Your Docker Desktop predates its CLI, or you use Docker Engine; start Docker yourself |
 | Every API call returns 502 | The API container isn't up yet; wait a few seconds, or check `docker compose logs api` |
 | UI driver times out at the add button | The agent disabled the button for blank input; the contract says it stays enabled |
 | UI tests pass but the API channel fails | Logic lives only in Angular; validation must also be in the API |
