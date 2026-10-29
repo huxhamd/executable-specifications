@@ -1,0 +1,46 @@
+{
+  "templateBranch": "template",
+  "roles": {
+    "designer": {
+      "summary": "Helps the human write executable specifications. Never implements.",
+      "owns": [
+        "acceptance/Specs/",
+        "acceptance/Dsl/",
+        "acceptance/Drivers/"
+      ]
+    },
+    "implementer": {
+      "summary": "Makes a committed, failing spec pass. Never touches specs or the harness.",
+      "owns": [
+        "api/",
+        "api.Tests/",
+        "web/"
+      ]
+    },
+    "tooling": {
+      "summary": "Improves the harness and the template. Writes no specs or app code.",
+      "owns": [
+        "acceptance/Infrastructure/",
+        "acceptance/Todo.AcceptanceTests.csproj",
+        ".claude/",
+        "scripts/",
+        "CLAUDE.md",
+        "README.md",
+        "Executable Specs with an AI Agent ToDo App Walkthrough.md",
+        ".editorconfig",
+        ".gitattributes",
+        ".gitignore",
+        "docker-compose.yml",
+        "api/Dockerfile",
+        "api/.dockerignore",
+        "web/Dockerfile",
+        "web/.dockerignore",
+        "web/nginx.conf"
+      ]
+    },
+    "unrestricted": {
+      "summary": "No ownership limits, for cross-cutting work. Cross-role changes are reported.",
+      "unrestricted": true
+    }
+  }
+}

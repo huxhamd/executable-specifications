@@ -1,25 +1,42 @@
 {
   "permissions": {
-    "deny": [
-        "Edit(/acceptance/**)",
-        "Edit(/.claude/settings.json)",
-        "Edit(/.claude/skills/implement-spec/**)",
-        "Edit(/scripts/run-acceptance-tests.ps1)",
-        "Edit(/scripts/check-protected-files.ps1)",
-        "Edit(/scripts/check-ready-to-implement.ps1)",
-        "Edit(/scripts/check-done.ps1)"
-    ],
     "ask": [
-        "Edit(/CLAUDE.md)"
+        "Edit(/.claude/settings.json)",
+        "Edit(/.claude/roles.json)",
+        "Edit(/scripts/roles.ps1)",
+        "Edit(/scripts/role-hooks.ps1)",
+        "Edit(/scripts/set-role.ps1)",
+        "Edit(/scripts/check-protected-files.ps1)"
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/scripts/role-hooks.ps1\" -Event SessionStart"
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File scripts/check-protected-files.ps1 -Record"
+            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/scripts/role-hooks.ps1\" -Event UserPromptSubmit"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/scripts/role-hooks.ps1\" -Event PreToolUse"
           }
         ]
       }
@@ -29,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File scripts/check-protected-files.ps1 -SinceRecord"
+            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/scripts/role-hooks.ps1\" -Event Stop"
           }
         ]
       }

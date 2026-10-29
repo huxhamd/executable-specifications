@@ -1,23 +1,21 @@
 # Working agreement
 
-## Ownership
-- `acceptance/` and every path denied in `.claude/settings.json` are
-  owned by the human. Never modify, delete, skip or rename them. If a
-  spec looks wrong or a guardrail blocks you, stop and explain why.
-- Never commit. The human commits after review.
+## Roles
+- Every session has one role: designer, implementer, tooling or
+  unrestricted. The human sets it per worktree with
+  `scripts/set-role.ps1`, and it is fixed for the whole session.
+- Your role and its instructions are given at the start of the session.
+  State your role in your first reply.
+- `.claude/roles.json` says which files each role may edit, and hooks
+  enforce it. Edit only files your role owns. If a hook blocks you, don't
+  look for another way: stop and tell the human which role should make
+  the change.
+- Never change your role, the role settings or the hooks.
+- Without a role you may read, explain and discuss, but not change files.
+
+## Always
+- Never commit or push. The human commits after review.
 - The drivers in `acceptance/Drivers` define the contract: API routes,
   JSON shape and the UI's `data-testid` attributes.
-
-## Testing
-- Test-drive all logic: write each unit test before its code, and cover
-  every branch, boundary, invalid input and error path. Every test must
-  assert something meaningful.
-- API tests live in `api.Tests/` (`Todo.Api.Tests`); web tests use the
-  Angular project's own setup.
-- Add narrow integration tests (one component, one real dependency) for
-  persistence against a real database, framework configuration and
-  external adapters. Never re-test what acceptance specs cover.
-
-## Done
-- Implement acceptance specs with the `implement-spec` skill.
-- A task is done when `pwsh -File scripts/check-done.ps1` passes.
+- Specs describe behaviour in domain language. Every spec must pass on
+  every channel unless it is marked `[Fact, Channels(...)]`.

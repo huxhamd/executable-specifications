@@ -10,15 +10,17 @@ By the end you'll have practised the full loop four times, including one unhappy
 
 **Who owns what**
 
-| Folder | What it holds | Owner |
+You own everything and review everything. The agent works in one of three roles at a time, and each role may change only its own part of the repo:
+
+| Folder | What it holds | Agent role that may change it |
 | --- | --- | --- |
-| `acceptance/Specs` | The executable specifications | You, locked from the agent |
-| `acceptance/Dsl` | The domain vocabulary the specs speak | You, agent may propose |
-| `acceptance/Drivers` | The contract: API routes and JSON, UI test IDs | You, agent may propose |
-| `api/` | ASP.NET Core API, its unit tests | Agent |
-| `web/` | Angular app, its unit tests | Agent |
-| `docker-compose.yml` and Dockerfiles | The deployable system | You set up once |
-| `CLAUDE.md`, `.claude/`, `scripts/` | The working agreement, guardrails and run scripts | You, locked from the agent |
+| `acceptance/Specs` | The executable specifications | Designer |
+| `acceptance/Dsl` | The domain vocabulary the specs speak | Designer |
+| `acceptance/Drivers` | The contract: API routes and JSON, UI test IDs | Designer |
+| `api/`, `api.Tests/`, `web/` | The app and its unit tests | Implementer |
+| `acceptance/Infrastructure`, `scripts/`, `.claude/`, `CLAUDE.md`, deployment files, this guide | The harness, guardrails and deployable system | Tooling |
+
+A fourth role, unrestricted, exists for cross-cutting work. Step 5 sets all this up.
 
 The drivers are where you make design decisions. They state which endpoints exist and which `data-testid` attributes the UI must expose, so the agent builds to your contract rather than inventing one.
 
@@ -753,69 +755,180 @@ public abstract class AcceptanceTestBase : IAsyncLifetime
 
 Run `dotnet build acceptance`. It should compile with no tests yet. Commit.
 
-## Step 5: Lock the specs and script the loop
+## Step 5: Roles and guardrails
 
-The agent must never be able to make a spec pass by changing the spec, a driver or the checks themselves. No single lock is enough, so use several: the working agreement tells the agent the rules, permission rules block its edit tools, and a guardrail script catches anything that slips through a shell command. Scripts then turn "run everything and check it" into one command each, for you and the agent alike. The scripts are PowerShell, so they run the same on Windows, macOS and Linux with `pwsh`.
+The agent must never be able to make a spec pass by changing the spec, a driver or the checks themselves. And the agent that helps you *write* a spec should never be the one that implements it: if it heard your design conversation, it would fill gaps in the spec from memory, and the spec would stop being the whole contract.
+
+So every Claude Code session has one **role**:
+
+| Role | May change | Typical work |
+| --- | --- | --- |
+| **Designer** | `acceptance/Specs`, `acceptance/Dsl`, `acceptance/Drivers` | Write specs with you, grow the DSL, design driver contracts, watch specs fail |
+| **Implementer** | `api/`, `api.Tests/`, `web/` | Make a committed, failing spec pass |
+| **Tooling** | The harness, scripts, Claude Code settings, deployment files and this guide | Improve the template, on the `template` branch |
+| **Unrestricted** | Anything | Cross-cutting work; changes that cross roles are reported to you |
+
+Every role can read everything and run the tests. The roles only limit the agent: your own edits are never blocked.
+
+### Setting a role
+
+A role belongs to a **worktree**, and you set it in that worktree's terminal:
+
+```powershell
+pwsh -File scripts/set-role.ps1             # shows the current role and the choices
+pwsh -File scripts/set-role.ps1 designer    # sets it
+pwsh -File scripts/set-role.ps1 none        # clears it
+```
+
+Then start a new Claude Code session. A session keeps the role it started with until it ends, even if the role is changed meanwhile: `set-role.ps1` only sets the role for the *next* session. Run it with no argument to see both the next session's role and the role of the last session started in the worktree. Switching roles is always a fresh session, so nothing from a design conversation reaches the implementer. With no role set, the agent can read and discuss but not change anything, and it tells you how to set one.
+
+The role is kept in the worktree's private git folder, so it's never committed and each worktree has its own. To run a designer and an implementer side by side, give each its own worktree and open each in its own VS Code window:
+
+```bash
+git worktree add ../todo-implement -b implement   # a second worktree on its own branch
+```
+
+A branch can only be checked out in one worktree, so the implementer works on its own branch, which you merge back after review. Keep to one active Claude Code session per worktree, because each session judges changes in the working tree as its own.
+
+### How the roles are enforced
+
+Hooks enforce the roles, so they don't depend on the agent remembering them:
+
+- **At session start**, the role is locked for the session and the agent is given its role instructions. It states its role in its first reply.
+- **Before every edit**, an edit outside the role's files is blocked, as is any edit inside the git folder or in another worktree. Shell commands that mention the role settings, or that commit or push, are blocked too.
+- **When the agent finishes a turn**, anything changed during the turn that the role doesn't own is caught, including changes made through shell commands. The agent is told to undo them, taking care not to discard your own uncommitted work. If it doesn't, it is allowed to finish and you see a warning. Unrestricted sessions are never blocked, but you see what they changed across roles.
+- **Before work counts as done**, `check-done.ps1` fails if any uncommitted change falls outside the role of the last session started in the worktree: the role the work was done under. A role set for the next session doesn't change how the work already in the tree is judged.
+
+An agent with a shell can always find *some* way to write a file, for example in another worktree through a shell command. The hooks block the obvious routes and catch the rest at the end of each turn; your review is the final gate. Each hook takes under a second, mostly PowerShell starting up.
+
+### The files
+
 
 **`CLAUDE.md`**
 
-The working agreement, at the repo root. Claude Code reads it at the start of every session. It refers to the skill and scripts that follow, and to `api.Tests/`, which the agent creates when it first test-drives API code.
+The working agreement every session shares, whatever its role. Claude Code reads it at the start of every session.
 
 ```markdown
 # Working agreement
 
-## Ownership
-- `acceptance/` and every path denied in `.claude/settings.json` are
-  owned by the human. Never modify, delete, skip or rename them. If a
-  spec looks wrong or a guardrail blocks you, stop and explain why.
-- Never commit. The human commits after review.
+## Roles
+- Every session has one role: designer, implementer, tooling or
+  unrestricted. The human sets it per worktree with
+  `scripts/set-role.ps1`, and it is fixed for the whole session.
+- Your role and its instructions are given at the start of the session.
+  State your role in your first reply.
+- `.claude/roles.json` says which files each role may edit, and hooks
+  enforce it. Edit only files your role owns. If a hook blocks you, don't
+  look for another way: stop and tell the human which role should make
+  the change.
+- Never change your role, the role settings or the hooks.
+- Without a role you may read, explain and discuss, but not change files.
+
+## Always
+- Never commit or push. The human commits after review.
 - The drivers in `acceptance/Drivers` define the contract: API routes,
   JSON shape and the UI's `data-testid` attributes.
+- Specs describe behaviour in domain language. Every spec must pass on
+  every channel unless it is marked `[Fact, Channels(...)]`.
+```
 
-## Testing
-- Test-drive all logic: write each unit test before its code, and cover
-  every branch, boundary, invalid input and error path. Every test must
-  assert something meaningful.
-- API tests live in `api.Tests/` (`Todo.Api.Tests`); web tests use the
-  Angular project's own setup.
-- Add narrow integration tests (one component, one real dependency) for
-  persistence against a real database, framework configuration and
-  external adapters. Never re-test what acceptance specs cover.
+**`.claude/roles.json`**
 
-## Done
-- Implement acceptance specs with the `implement-spec` skill.
-- A task is done when `pwsh -File scripts/check-done.ps1` passes.
+The ownership table: the single source of truth for who may change what. A folder entry ends in `/`. When entries overlap, the most specific wins, which is how `api/Dockerfile` belongs to tooling while the rest of `api/` belongs to the implementer. A path in no entry belongs to nobody, so only an unrestricted session can change it; `set-role.ps1` refuses to run if two roles claim the same entry.
+
+```json
+{
+  "templateBranch": "template",
+  "roles": {
+    "designer": {
+      "summary": "Helps the human write executable specifications. Never implements.",
+      "owns": [
+        "acceptance/Specs/",
+        "acceptance/Dsl/",
+        "acceptance/Drivers/"
+      ]
+    },
+    "implementer": {
+      "summary": "Makes a committed, failing spec pass. Never touches specs or the harness.",
+      "owns": [
+        "api/",
+        "api.Tests/",
+        "web/"
+      ]
+    },
+    "tooling": {
+      "summary": "Improves the harness and the template. Writes no specs or app code.",
+      "owns": [
+        "acceptance/Infrastructure/",
+        "acceptance/Todo.AcceptanceTests.csproj",
+        ".claude/",
+        "scripts/",
+        "CLAUDE.md",
+        "README.md",
+        "Executable Specs with an AI Agent ToDo App Walkthrough.md",
+        ".editorconfig",
+        ".gitattributes",
+        ".gitignore",
+        "docker-compose.yml",
+        "api/Dockerfile",
+        "api/.dockerignore",
+        "web/Dockerfile",
+        "web/.dockerignore",
+        "web/nginx.conf"
+      ]
+    },
+    "unrestricted": {
+      "summary": "No ownership limits, for cross-cutting work. Cross-role changes are reported.",
+      "unrestricted": true
+    }
+  }
+}
 ```
 
 **`.claude/settings.json`**
 
-The `deny` rules block the agent's file-editing tools on everything it must not change: `acceptance/`, this file, the skill and the scripts. The leading `/` anchors a path to the project root. Changes to `CLAUDE.md` need your approval.
-
-The two hooks catch anything the deny rules miss, such as a shell command, as soon as the agent finishes rather than at review. `UserPromptSubmit` records the state of the protected files each time you send a prompt, and `Stop` checks what changed since. So only changes made *during the agent's turn* count. Your own uncommitted edits, such as a spec you're still writing, never stop the agent finishing.
+Wires the hooks up. `$CLAUDE_PROJECT_DIR` keeps them working if the agent changes directory. The `ask` rules mean even tooling and unrestricted sessions need your approval for each change to the enforcement itself.
 
 ```json
 {
   "permissions": {
-    "deny": [
-        "Edit(/acceptance/**)",
-        "Edit(/.claude/settings.json)",
-        "Edit(/.claude/skills/implement-spec/**)",
-        "Edit(/scripts/run-acceptance-tests.ps1)",
-        "Edit(/scripts/check-protected-files.ps1)",
-        "Edit(/scripts/check-ready-to-implement.ps1)",
-        "Edit(/scripts/check-done.ps1)"
-    ],
     "ask": [
-        "Edit(/CLAUDE.md)"
+        "Edit(/.claude/settings.json)",
+        "Edit(/.claude/roles.json)",
+        "Edit(/scripts/roles.ps1)",
+        "Edit(/scripts/role-hooks.ps1)",
+        "Edit(/scripts/set-role.ps1)",
+        "Edit(/scripts/check-protected-files.ps1)"
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/scripts/role-hooks.ps1\" -Event SessionStart"
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File scripts/check-protected-files.ps1 -Record"
+            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/scripts/role-hooks.ps1\" -Event UserPromptSubmit"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/scripts/role-hooks.ps1\" -Event PreToolUse"
           }
         ]
       }
@@ -825,7 +938,7 @@ The two hooks catch anything the deny rules miss, such as a shell command, as so
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File scripts/check-protected-files.ps1 -SinceRecord"
+            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/scripts/role-hooks.ps1\" -Event Stop"
           }
         ]
       }
@@ -834,248 +947,101 @@ The two hooks catch anything the deny rules miss, such as a shell command, as so
 }
 ```
 
-**`scripts/check-protected-files.ps1`**
+**`.claude/roles/designer.md`**
 
-The real lock, in three modes. With no switch it fails on *any* uncommitted change to a protected path; `check-done.ps1` uses this, so nothing reaches a commit unreviewed. `-Record` and `-SinceRecord` are the two hooks. The record lives in the `.git` folder, one file per session, so it is never committed.
+Role instructions, given to the agent at session start. The designer's job is to make specs good and to make them fail for the right reason.
 
-When the agent has changed a protected file, exit code 2 blocks it from finishing and shows it the message. Files you had already changed get different instructions, so the agent never discards your work with `git restore`. If the agent still hasn't put things right when it next tries to finish, the hook lets the turn end rather than loop, and shows *you* a warning instead. The strict check in `check-done.ps1` still fails until it's resolved.
+```markdown
+You help the human write executable specifications. You never implement them.
 
-```powershell
-# Checks that nothing the agent must not change has changed.
-#
-#   (no switch)    Fails if any protected path differs from the last commit.
-#                  Used by check-done.ps1: the human's definition of done.
-#   -Record        UserPromptSubmit hook. Records the protected paths' current
-#                  state for this session, so the Stop hook can tell what the
-#                  agent changed during the turn. Prints nothing: a
-#                  UserPromptSubmit hook's output becomes context for Claude.
-#   -SinceRecord   Stop hook. Fails only if protected paths changed since the
-#                  prompt was submitted, so the human's own uncommitted edits
-#                  never trap the agent.
-param(
-    [switch]$Record,
-    [switch]$SinceRecord
-)
-
-$protected = @(
-    "acceptance/",
-    ".claude/settings.json",
-    ".claude/skills/implement-spec/",
-    "scripts/run-acceptance-tests.ps1",
-    "scripts/check-protected-files.ps1",
-    "scripts/check-ready-to-implement.ps1",
-    "scripts/check-done.ps1"
-)
-
-Set-Location (git rev-parse --show-toplevel)
-
-# Each changed protected file, with a hash of its content or "deleted".
-function Get-ProtectedState {
-    $paths = @(git diff --name-only HEAD -- $protected) +
-             @(git ls-files --others --exclude-standard -- $protected)
-    $state = [ordered]@{}
-    foreach ($path in $paths | Where-Object { $_ } | Sort-Object -Unique) {
-        $state[$path] = if (Test-Path -LiteralPath $path -PathType Leaf) {
-            git hash-object -- $path
-        } else { "deleted" }
-    }
-    $state
-}
-
-function Get-RecordPath([string]$sessionId) {
-    $folder = git rev-parse --git-path claude-protected-files
-    New-Item -ItemType Directory -Force -Path $folder | Out-Null
-    $safeId = $sessionId -replace '[^A-Za-z0-9_-]', '_'
-    Join-Path $folder "$safeId.json"
-}
-
-if ($Record -or $SinceRecord) {
-    $hookInput = [Console]::In.ReadToEnd() | ConvertFrom-Json
-    $recordPath = Get-RecordPath $hookInput.session_id
-}
-
-if ($Record) {
-    Get-ProtectedState | ConvertTo-Json -Compress | Set-Content -LiteralPath $recordPath
-    exit 0
-}
-
-$current = Get-ProtectedState
-
-if (-not $SinceRecord) {
-    if ($current.Count) {
-        [Console]::Error.WriteLine(
-            "Protected files have uncommitted changes:`n$($current.Keys -join "`n")")
-        exit 1
-    }
-    Write-Host "Protected files intact: none have changed."
-    exit 0
-}
-
-# Without a record, fall back to comparing with the last commit.
-$recorded = @{}
-if (Test-Path -LiteralPath $recordPath) {
-    $json = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
-    if ($json) { $json.PSObject.Properties | ForEach-Object { $recorded[$_.Name] = $_.Value } }
-}
-
-$changed = @($current.Keys) + @($recorded.Keys) | Sort-Object -Unique |
-    Where-Object { $current[$_] -ne $recorded[$_] }
-if (-not $changed) { exit 0 }
-
-$list = $changed -join "`n"
-if ($hookInput.stop_hook_active) {
-    # Already asked once. Let the turn end rather than loop, and warn the human.
-    @{ systemMessage = "Protected files changed during this turn and were not restored:`n$list" } |
-        ConvertTo-Json -Compress
-    exit 0
-}
-
-# Files the human had already changed must not be restored with git, or their work is lost.
-$clean = @($changed | Where-Object { -not $recorded.Contains($_) })
-$dirty = @($changed | Where-Object { $recorded.Contains($_) })
-$message = "You changed protected files during this turn. You must not change these."
-if ($clean) {
-    $message += "`n`nUndo these with git restore (or delete them if you created them):`n" +
-        ($clean -join "`n")
-}
-if ($dirty) {
-    $message += "`n`nThese already had the human's uncommitted changes before this turn. " +
-        "Undo only your own edits and do not use git restore, which would discard " +
-        "the human's work:`n" + ($dirty -join "`n")
-}
-$message += "`n`nThen stop and explain why you needed to change them."
-[Console]::Error.WriteLine($message)
-exit 2
+- Work in the spec layers: specs in `acceptance/Specs`, the vocabulary in
+  `acceptance/Dsl`, and the contract in `acceptance/Drivers`. Keep each
+  layer to its own job: specs say what, the DSL gives the words, drivers
+  say how each channel reaches the system.
+- Read the app code only to understand current behaviour. Never shape a
+  spec around how the code happens to work.
+- When a spec needs new DSL methods or driver contract (endpoints, status
+  codes, `data-testid` values), propose them and explain the decisions
+  they force. Ask about anything the human hasn't decided.
+- Prefer specs for every channel. Use `[Fact, Channels(...)]` only for
+  behaviour a channel genuinely lacks, and split a business rule from its
+  channel-specific feedback.
+- Check your work: `dotnet build acceptance` must pass, and
+  `pwsh -File scripts/run-acceptance-tests.ps1` must show each new spec
+  failing because the behaviour is missing, not because of broken plumbing.
+- Never make a spec pass. If a new spec already passes, say so.
+- When a spec is ready, tell the human to review and commit it. The
+  implementer works only from committed specs.
 ```
 
-**`scripts/run-acceptance-tests.ps1`**
+**`.claude/roles/implementer.md`**
 
-Deploys the system and runs every spec through each channel in turn. `--force-recreate` gives every run fresh containers, so data doesn't build up across runs. Within a run, both channels share the same system, which is fine because aliasing keeps specs apart.
+The implementer works from the committed spec alone, with the testing rules that used to be in `CLAUDE.md`.
 
-If Docker isn't running, the script starts Docker Desktop with its CLI (`docker desktop start`) and waits for the engine to accept commands. If it can't, it stops with a plain message rather than failing partway through, so an agent reports it as an environment problem instead of debugging your code. To avoid the wait altogether, turn on *Start Docker Desktop when you sign in* in Docker Desktop's general settings.
+```markdown
+You make a committed, failing acceptance spec pass. You never change specs
+or the harness.
 
-```powershell
-# Deploys the system in fresh containers and runs every spec through each channel.
-
-# Docker must be running first. If it isn't, try to start Docker Desktop and wait for it.
-if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
-    [Console]::Error.WriteLine("Docker isn't installed, or isn't on the PATH.")
-    exit 1
-}
-
-function Test-DockerRunning {
-    docker info *> $null
-    $LASTEXITCODE -eq 0
-}
-
-if (-not (Test-DockerRunning)) {
-    $waitSeconds = 120
-    Write-Host "Docker isn't running. Starting Docker Desktop (waiting up to $waitSeconds seconds)..."
-    # --detach returns at once; Docker is ready only when `docker info` succeeds.
-    docker desktop start --detach *> $null
-    if ($LASTEXITCODE -ne 0) {
-        # No Docker Desktop CLI: an older Docker Desktop, or Docker Engine without Desktop.
-        [Console]::Error.WriteLine(
-            "Docker isn't running and Docker Desktop couldn't be started from here. Start Docker, then run this again.")
-        exit 1
-    }
-    $timer = [Diagnostics.Stopwatch]::StartNew()
-    while (-not (Test-DockerRunning) -and $timer.Elapsed.TotalSeconds -lt $waitSeconds) {
-        Start-Sleep -Seconds 3
-    }
-    if (-not (Test-DockerRunning)) {
-        [Console]::Error.WriteLine(
-            "Docker isn't running and couldn't be started. Start Docker Desktop, then run this again.")
-        exit 1
-    }
-    Write-Host "Docker is running."
-}
-
-docker compose up -d --build --force-recreate
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-$failed = @()
-foreach ($channel in "api", "ui") {
-    Write-Host "`n=== Acceptance tests: $channel ===`n"
-    $env:ACCEPTANCE_CHANNEL = $channel
-    dotnet test acceptance
-    if ($LASTEXITCODE -ne 0) { $failed += $channel }
-}
-Remove-Item Env:ACCEPTANCE_CHANNEL
-
-if ($failed) {
-    Write-Host "`nFailed channels: $($failed -join ', ')" -ForegroundColor Red
-    exit 1
-}
-Write-Host "`nAll channels passed" -ForegroundColor Green
+- Implement specs with the `implement-spec` skill. A task is done when
+  `pwsh -File scripts/check-done.ps1` passes.
+- The committed spec and the driver contracts are the whole requirement.
+  If they are ambiguous or leave a decision open, stop and ask. Don't fill
+  gaps with guesses.
+- Test-drive all logic: write each unit test before its code, and cover
+  every branch, boundary, invalid input and error path. Every test must
+  assert something meaningful.
+- API tests live in `api.Tests/` (`Todo.Api.Tests`); web tests use the
+  Angular project's own setup.
+- Add narrow integration tests (one component, one real dependency) for
+  persistence against a real database, framework configuration and
+  external adapters. Never re-test what acceptance specs cover.
+- Deployment files (Dockerfiles, `docker-compose.yml`, `web/nginx.conf`)
+  belong to the tooling role. If you need a change there, ask.
 ```
 
-**`scripts/check-done.ps1`**
+**`.claude/roles/tooling.md`**
 
-The definition of done: the protected-files check, all unit tests and all acceptance tests, with a summary at the end. The agent's task is finished only when this passes, and so is your review.
+Tooling changes the rules for every role, including itself, so its changes to the enforcement always ask first.
 
-```powershell
-$results = [ordered]@{}
+```markdown
+You improve the harness and the template: the acceptance infrastructure,
+scripts, Claude Code settings, role definitions, deployment files and the
+guide. You don't write specs or app code.
 
-function Invoke-Check([string]$name, [scriptblock]$check) {
-    Write-Host "`n=== $name ===`n"
-    & $check
-    $results[$name] = ($LASTEXITCODE -eq 0)
-}
-
-Invoke-Check "Protected files"  { pwsh -NoProfile -File scripts/check-protected-files.ps1 }
-Invoke-Check "API unit tests"   { dotnet test api.Tests }
-Invoke-Check "Web unit tests"   { Push-Location web; npx ng test --watch=false; Pop-Location }
-Invoke-Check "Acceptance tests" { pwsh -NoProfile -File scripts/run-acceptance-tests.ps1 }
-
-Write-Host "`n=== Summary ===`n"
-foreach ($entry in $results.GetEnumerator()) {
-    if ($entry.Value) { Write-Host "PASS  $($entry.Key)" -ForegroundColor Green }
-    else              { Write-Host "FAIL  $($entry.Key)" -ForegroundColor Red }
-}
-
-if ($results.Values -contains $false) { exit 1 }
-Write-Host "`nVerified: all checks passed." -ForegroundColor Green
+- Tooling work belongs on the `template` branch. Projects get it by
+  merging `template` in.
+- Changes to the enforcement itself (`.claude/settings.json`,
+  `.claude/roles.json` and the role scripts) ask the human for approval
+  each time. Explain what each such change loosens or tightens.
+- Test script changes before calling them done, including the failure
+  cases, and say what you couldn't test.
+- The guide shows some files in full. When you change one of them,
+  update the guide to match.
+- Every path should belong to exactly one role. When you add a file or
+  folder, add it to `.claude/roles.json`.
 ```
 
-**`scripts/check-ready-to-implement.ps1`**
+**`.claude/roles/unrestricted.md`**
 
-Checks the starting point before the agent begins: the working tree is clean, and the spec it was asked to implement is committed. A clean start means the agent's diff contains only its own work. The spec is found by name in the committed files, so it doesn't matter how many commits you've made since writing it.
+The escape hatch. Use it for the odd cross-cutting change; if your team reaches for it often, the ownership table probably needs adjusting.
 
-```powershell
-# Checks the starting point before the agent implements a spec:
-# the working tree is clean, and the named spec is committed.
-param([string]$Spec)
+```markdown
+You have no ownership limits. This role is for cross-cutting work that
+doesn't fit one role.
 
-# Not a mandatory parameter: PowerShell would prompt for it, which an agent can't answer.
-if (-not $Spec) {
-    [Console]::Error.WriteLine("Usage: pwsh -File scripts/check-ready-to-implement.ps1 -Spec <SpecMethodName>")
-    exit 1
-}
-
-if ($Spec -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
-    [Console]::Error.WriteLine("'$Spec' is not a spec method name.")
-    exit 1
-}
-
-$dirty = git status --porcelain
-if ($dirty) {
-    [Console]::Error.WriteLine("Working tree is not clean:`n$dirty")
-    exit 1
-}
-
-$found = git grep -n -E "Task\s+$Spec\s*\(" HEAD -- acceptance/Specs
-if (-not $found) {
-    [Console]::Error.WriteLine("No committed spec named '$Spec' in acceptance/Specs.")
-    exit 1
-}
-
-Write-Host "Ready to implement. Target spec:`n$found"
+- Changes that cross role boundaries are reported to the human at the end
+  of each turn.
+- Keep spec changes and implementation separable: say which of your
+  changes belong to which role, so the human can review and commit them
+  apart. A spec and the code that passes it, written in one conversation,
+  no longer check each other.
+- Changes to the enforcement itself still ask the human for approval.
+- If the work fits a single role, suggest using that role instead.
 ```
 
 **`.claude/skills/implement-spec/SKILL.md`**
 
-A Claude Code skill: the agent's procedure for making a failing spec pass. It runs the readiness check for the spec you named, confirms the spec fails for the right reason, implements to the definition of done in `CLAUDE.md`, and says when to stop and ask rather than push on. You start it with `/implement-spec <SpecName>`.
+A Claude Code skill: the implementer's procedure for making a failing spec pass. It runs the readiness check for the spec you named, confirms the spec fails for the right reason, implements to the definition of done, and says when to stop and ask rather than push on. You start it with `/implement-spec <SpecName>`.
 
 ```markdown
 ---
@@ -1084,6 +1050,9 @@ description: Make a failing acceptance spec pass. Use when asked to implement an
 ---
 
 # Implement a failing acceptance spec
+
+Only the implementer role uses this skill. If your session's role is
+anything else, stop and tell the human.
 
 ## When to stop
 At any point, stop and report instead of continuing if:
@@ -1114,6 +1083,22 @@ change broke the build, undo that change only.
    spec didn't cover that a human should decide.
 ```
 
+### The scripts
+
+The scripts are PowerShell, so they run the same on Windows, macOS and Linux with `pwsh`. They're in the template repository; they're too long to type in, but worth reading.
+
+| Script | What it does |
+| --- | --- |
+| `scripts/set-role.ps1` | Sets the role for this worktree's next session, or shows it alongside the last session's role |
+| `scripts/role-hooks.ps1` | The four hooks that enforce the session's role |
+| `scripts/roles.ps1` | Shared by the role scripts: reads `roles.json`, works out who owns a path, tracks what changed |
+| `scripts/check-protected-files.ps1` | Fails if an uncommitted change is outside the role of the last session started here |
+| `scripts/run-acceptance-tests.ps1` | Starts Docker if needed, deploys fresh containers, runs every spec on each channel |
+| `scripts/check-ready-to-implement.ps1` | Checks the tree is clean and the named spec is committed |
+| `scripts/check-done.ps1` | The definition of done: the protected-files check, all unit tests and all acceptance tests |
+
+`run-acceptance-tests.ps1` uses `--force-recreate`, so every run gets fresh containers and data doesn't build up across runs. Within a run both channels share one system, which is fine because aliasing keeps specs apart. If Docker isn't running, it starts Docker Desktop and waits; to avoid the wait, turn on *Start Docker Desktop when you sign in* in Docker Desktop's general settings.
+
 To run one channel by itself, for example while writing a spec, start the stack and set the channel for that run:
 
 ```powershell
@@ -1121,13 +1106,13 @@ docker compose up -d --build
 $env:ACCEPTANCE_CHANNEL = "ui"; dotnet test acceptance
 ```
 
-On a real team the same checks run in CI, with a `CODEOWNERS` entry putting the protected paths behind review. Commit all of these files before starting the next step.
+On a real team the same checks run in CI, with a `CODEOWNERS` entry putting each role's files behind the right reviewers. Commit all of these files before starting the next step.
 
 ## Step 6: First loop, add a todo
 
 This is the loop you'll repeat for every feature: write a spec, watch it fail, commit, hand it over, review.
 
-**1. Write the spec** in `acceptance/Specs/AddingTodos.cs`:
+**1. Write the spec** in `acceptance/Specs/AddingTodos.cs`. Write this first one yourself. Later, a designer session can help: `pwsh -File scripts/set-role.ps1 designer`, start a session, and talk the feature through.
 
 ```csharp
 using acceptance.Infrastructure;
@@ -1155,14 +1140,20 @@ The API run should fail at `AddTodo` with "Could not add todo 'Buy milk'" and a 
 
 **3. Commit the spec.** `git add -A && git commit -m "Spec: user can add a todo"`
 
-**4. Hand it to the agent.** Start `claude` in the repo root and give it something like:
+**4. Hand it to the agent.** Make this worktree an implementer, then start a new Claude Code session:
+
+```powershell
+pwsh -File scripts/set-role.ps1 implementer
+```
+
+Give it something like:
 
 ```text
 /implement-spec UserCanAddATodo. Keep it simple: in-memory storage
 is fine for now.
 ```
 
-The skill and `CLAUDE.md` already tell it where the contract lives, what it may change and when it's done, so the prompt only needs the spec and any design steer.
+The skill and the implementer's role instructions already tell it where the contract lives, what it may change and when it's done, so the prompt only needs the spec and any design steer.
 
 **5. Review.**
 
@@ -1189,7 +1180,7 @@ Run `pwsh -File scripts/run-acceptance-tests.ps1`. Right now the app probably ac
 
 Note that `"A title is required"` pins the exact wording on purpose. The API must return it in the 400 body's `errors`, as the API driver's contract describes, and the UI must show it in `error-message`. If you'd rather not fix the wording, make the DSL method check only that *some* error was shown.
 
-Commit, then hand it over:
+Commit, then hand it over in a new implementer session:
 
 ```text
 /implement-spec CannotAddATodoWithoutATitle. Validate in the API; the
@@ -1244,7 +1235,7 @@ On the API run it is reported as skipped; on the UI run it fails until `title-to
 - **Split the rule from the feedback.** "A title can't be longer than 255 characters" is a business rule, so it belongs in a spec for every channel, using `AttemptToAddTodoWithTitleOfLength`. Only the warning while typing is UI-only. Otherwise the API would accept what the UI forbids.
 - **New optional capabilities follow the same shape:** an interface in the domain folder, a nullable member with a `null` default in `IChannel.<Domain>.cs`, and a driver plus one line of wiring for each channel that supports it.
 
-This is where most of the real thinking lives. You'll notice that writing the driver forces decisions a prose spec would leave vague.
+This is where most of the real thinking lives, and where a designer session earns its place: it can draft the spec, DSL and driver changes with you, and point out the decisions they force. You'll notice that writing the driver forces decisions a prose spec would leave vague.
 
 ## Step 9: Prove the point
 
@@ -1252,7 +1243,7 @@ This is the payoff: big implementation changes with zero changes to `acceptance/
 
 1. **Swap the storage.** Ask the agent to replace in-memory storage with EF Core and SQLite, persisted in a Docker volume. Every spec should still pass untouched.
 2. **Restyle the UI.** Ask for a full visual redesign or a component library. The drivers rely only on test IDs, so the specs survive.
-3. **Test the lock.** Write a spec the app can't reasonably satisfy, such as an assertion with a typo in the expected message, and ask the agent to "make the build green". It should stop and flag the spec rather than edit it. If it tries anyway, the permission rules or the guardrail check will catch it.
+3. **Test the lock.** Write a spec the app can't reasonably satisfy, such as an assertion with a typo in the expected message, and ask the agent to "make the build green". It should stop and flag the spec rather than edit it. If it tries anyway, the role hooks will block or catch it. Then try the opposite in a designer session: ask it to implement the feature its spec describes.
 
 If a spec breaks during 1 or 2, look at why. It usually means the spec or driver leaked an implementation detail, which is exactly the feedback this approach is meant to give you.
 
@@ -1269,8 +1260,13 @@ If a spec breaks during 1 or 2, look at why. It usually means the spec or driver
 | Old behaviour after the agent's changes | You started the stack by hand without `--build`; `scripts/run-acceptance-tests.ps1` always rebuilds |
 | A spec is reported as skipped | It's limited to other channels with `[Channels(...)]`, which is expected |
 | `check-ready-to-implement.ps1` fails | Commit everything, including the spec, and name the spec method exactly |
-| The agent is told it changed protected files | It changed one during its turn, perhaps through a shell command; it should undo that and explain why |
-| A "Protected files changed" warning appears when the agent finishes | The agent didn't undo a protected change after being told; review the diff and revert it yourself |
+| The agent says no role is set, or every edit is blocked | Run `pwsh -File scripts/set-role.ps1 <role>` in this worktree, then start a new session |
+| The agent still has its old role | Sessions keep the role they started with; start a new session |
+| An edit is blocked as belonging to another role | Working as designed: use a session with that role, or add the path to `.claude/roles.json` if it's in the wrong role |
+| A new file is blocked as not owned by any role | Add it, or its folder, to the right role in `.claude/roles.json` (a tooling change) |
+| The agent is told it changed files outside its role | It changed one during its turn, perhaps through a shell command; it should undo that and explain why |
+| A "Files outside the … role changed" warning appears | The agent didn't undo a change after being told; review the diff and revert it yourself |
+| `check-protected-files.ps1` fails in `check-done.ps1` | An uncommitted change is outside the role of the last session started here, perhaps your own edit; commit or move it first |
 
 ## Questions to reflect on
 

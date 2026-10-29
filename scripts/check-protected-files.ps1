@@ -1,105 +1,36 @@
-# Checks that nothing the agent must not change has changed.
+# Checks that every uncommitted change belongs to the role of the last session
+# started in this worktree: the role the work in the tree was done under. Used by
+# check-done.ps1, so work can't be called done while it changes files its role
+# doesn't own. During a session, the role hooks enforce the same rule.
 #
-#   (no switch)    Fails if any protected path differs from the last commit.
-#                  Used by check-done.ps1: the human's definition of done.
-#   -Record        UserPromptSubmit hook. Records the protected paths' current
-#                  state for this session, so the Stop hook can tell what the
-#                  agent changed during the turn. Prints nothing: a
-#                  UserPromptSubmit hook's output becomes context for Claude.
-#   -SinceRecord   Stop hook. Fails only if protected paths changed since the
-#                  prompt was submitted, so the human's own uncommitted edits
-#                  never trap the agent.
-param(
-    [switch]$Record,
-    [switch]$SinceRecord
-)
+# It deliberately ignores a role set with set-role.ps1 since then: that role
+# applies to the next session, not to the work already here.
 
-$protected = @(
-    "acceptance/",
-    ".claude/settings.json",
-    ".claude/skills/implement-spec/",
-    "scripts/run-acceptance-tests.ps1",
-    "scripts/check-protected-files.ps1",
-    "scripts/check-ready-to-implement.ps1",
-    "scripts/check-done.ps1"
-)
+. "$PSScriptRoot/roles.ps1"
 
-Set-Location (git rev-parse --show-toplevel)
-
-# Each changed protected file, with a hash of its content or "deleted".
-function Get-ProtectedState {
-    $paths = @(git diff --name-only HEAD -- $protected) +
-             @(git ls-files --others --exclude-standard -- $protected)
-    $state = [ordered]@{}
-    foreach ($path in $paths | Where-Object { $_ } | Sort-Object -Unique) {
-        $state[$path] = if (Test-Path -LiteralPath $path -PathType Leaf) {
-            git hash-object -- $path
-        } else { "deleted" }
-    }
-    $state
+$role = Get-ActiveRole
+$source = "the role of the last session started here"
+if (-not $role) {
+    $role = Get-WorktreeRole
+    $source = "no session has started here yet, so this worktree's role"
 }
+$changed = @((Get-WorkingState).Keys)
 
-function Get-RecordPath([string]$sessionId) {
-    $folder = git rev-parse --git-path claude-protected-files
-    New-Item -ItemType Directory -Force -Path $folder | Out-Null
-    $safeId = $sessionId -replace '[^A-Za-z0-9_-]', '_'
-    Join-Path $folder "$safeId.json"
-}
-
-if ($Record -or $SinceRecord) {
-    $hookInput = [Console]::In.ReadToEnd() | ConvertFrom-Json
-    $recordPath = Get-RecordPath $hookInput.session_id
-}
-
-if ($Record) {
-    Get-ProtectedState | ConvertTo-Json -Compress | Set-Content -LiteralPath $recordPath
+if (Test-Unrestricted $role) {
+    Write-Host "Role is $role ($source): no ownership limits to check."
     exit 0
 }
 
-$current = Get-ProtectedState
-
-if (-not $SinceRecord) {
-    if ($current.Count) {
-        [Console]::Error.WriteLine(
-            "Protected files have uncommitted changes:`n$($current.Keys -join "`n")")
-        exit 1
-    }
-    Write-Host "Protected files intact: none have changed."
-    exit 0
+$outside = @($changed | Where-Object { -not (Test-MayEdit $role $_) })
+if ($outside -and $role -eq 'none') {
+    $why = if (Get-ActiveRole) { "The last session started here had no role" } else { "No role is set for this worktree" }
+    [Console]::Error.WriteLine("$why, so no uncommitted changes are allowed:`n$($outside -join "`n")")
+    exit 1
 }
-
-# Without a record, fall back to comparing with the last commit.
-$recorded = @{}
-if (Test-Path -LiteralPath $recordPath) {
-    $json = Get-Content -LiteralPath $recordPath -Raw | ConvertFrom-Json
-    if ($json) { $json.PSObject.Properties | ForEach-Object { $recorded[$_.Name] = $_.Value } }
+if ($outside) {
+    [Console]::Error.WriteLine(
+        "These uncommitted changes are outside the $role role's files ($source):`n$($outside -join "`n")")
+    exit 1
 }
-
-$changed = @($current.Keys) + @($recorded.Keys) | Sort-Object -Unique |
-    Where-Object { $current[$_] -ne $recorded[$_] }
-if (-not $changed) { exit 0 }
-
-$list = $changed -join "`n"
-if ($hookInput.stop_hook_active) {
-    # Already asked once. Let the turn end rather than loop, and warn the human.
-    @{ systemMessage = "Protected files changed during this turn and were not restored:`n$list" } |
-        ConvertTo-Json -Compress
-    exit 0
-}
-
-# Files the human had already changed must not be restored with git, or their work is lost.
-$clean = @($changed | Where-Object { -not $recorded.Contains($_) })
-$dirty = @($changed | Where-Object { $recorded.Contains($_) })
-$message = "You changed protected files during this turn. You must not change these."
-if ($clean) {
-    $message += "`n`nUndo these with git restore (or delete them if you created them):`n" +
-        ($clean -join "`n")
-}
-if ($dirty) {
-    $message += "`n`nThese already had the human's uncommitted changes before this turn. " +
-        "Undo only your own edits and do not use git restore, which would discard " +
-        "the human's work:`n" + ($dirty -join "`n")
-}
-$message += "`n`nThen stop and explain why you needed to change them."
-[Console]::Error.WriteLine($message)
-exit 2
+Write-Host "Protected files intact: every change belongs to the $role role ($source)."
+exit 0
