@@ -1,5 +1,6 @@
 using Microsoft.Playwright;
 using acceptance.Dsl;
+using acceptance.Dsl.Todos;
 using acceptance.Drivers.Channels;
 
 namespace acceptance.Infrastructure;
@@ -12,7 +13,8 @@ public abstract class AcceptanceTestBase : IAsyncLifetime
     private IPlaywright? _playwright;
     private IBrowser? _browser;
 
-    protected UserDsl User { get; private set; } = null!;
+    // One property per business domain. Specs read like Todos.Add("Buy milk").
+    protected TodosDsl Todos { get; private set; } = null!;
 
     public async ValueTask InitializeAsync()
     {
@@ -22,7 +24,8 @@ public abstract class AcceptanceTestBase : IAsyncLifetime
             Channel.Ui => await CreateUiChannel(),
             var other => throw new InvalidOperationException($"No channel set up for {other}.")
         };
-        User = new UserDsl(channel, new Alias());
+        var context = new SpecContext();
+        Todos = new TodosDsl(channel, context);
     }
 
     private static IChannel CreateApiChannel() =>

@@ -152,7 +152,10 @@ acceptance/
     AcceptanceTestBase.cs       builds the channel and the DSL
   Dsl/
     Alias.cs                    unique names per test
-    UserDsl.cs                  the vocabulary specs use
+    SpecContext.cs              what a spec shares across domains
+    DslBase.cs                  the base for each domain's DSL
+    Todos/                      one folder per domain, like the drivers
+      TodosDsl.cs               the todo vocabulary specs use
   Drivers/
     DriverResult.cs             what a driver action did
     Channels/                   one class per way of reaching the system
@@ -173,7 +176,7 @@ acceptance/
   Specs/                        empty for now
 ```
 
-Each folder level splits on one thing. Under `Drivers/`, folders are domains (`Todos/`, later perhaps `Lists/`), and inside a domain, folders are channels. `Channels/` holds everything about a channel that isn't specific to one domain.
+Each folder level splits on one thing. Under `Drivers/`, folders are domains (`Todos/`, later perhaps `Lists/`), and inside a domain, folders are channels. `Dsl/` is split by the same domains, so each domain's vocabulary sits beside nothing but its own. `Channels/` holds everything about a channel that isn't specific to one domain.
 
 A **channel** is one way of reaching the whole system: the public API or the browser. It is made of small **drivers**, one per capability. A capability every channel must support, like `ITodoDriver`, is required. One only some channels support, like `ITodoTextInputDriver` (live feedback while typing, which only a browser has), is optional: channels that don't support it simply don't mention it.
 
@@ -620,68 +623,107 @@ public partial class UiChannel
 }
 ```
 
-### Dsl/UserDsl.cs
+### Dsl/SpecContext.cs
 
-Each action comes in two forms. `AddTodo` must succeed and fails the test on that line if it doesn't. `AttemptToAddTodo` just tries and records the outcome, so the next line can check that the rejection was the right one. Confirmations are always lines of their own.
+The DSL is organised by **business domain**, not by who is acting: specs say `Todos.Add("Buy milk")`, and later perhaps `Lists.Create(...)` or `Accounts.Register("user: Alice")`. People are data, aliased like everything else, not objects. Each domain's DSL mirrors that domain's drivers, so no single DSL class grows to hold every domain's vocabulary.
 
-The DSL takes the whole channel and reaches each capability through it. If a spec uses an optional capability on a channel that doesn't have it, the error says how to fix the spec.
+Some state belongs to the spec, not to a domain: its aliases, and the outcome of its last action. Every domain's DSL shares this one context.
 
 ```csharp
 using acceptance.Drivers;
-using acceptance.Drivers.Channels;
-using acceptance.Drivers.Todos;
 
 namespace acceptance.Dsl;
 
-public class UserDsl(IChannel channel, Alias alias)
+// What one spec carries across every domain's DSL: its aliases, and the
+// outcome of its last action, whichever domain that action was in.
+public class SpecContext
 {
-    private DriverResult? _lastResult;
+    public Alias Alias { get; } = new();
+    public DriverResult? LastResult { get; set; }
+}
+```
 
-    private ITodoDriver Todos => channel.Todos;
+### Dsl/DslBase.cs
+
+What every domain's DSL has in common. Each action comes in two forms: `Add` must succeed and fails the test on that line if it doesn't, while `AttemptToAdd` just tries and records the outcome, so the next line can check that the rejection was the right one. `ConfirmErrorIsShown` checks that outcome, whichever domain the action was in. Confirmations are always lines of their own.
+
+```csharp
+using acceptance.Drivers;
+
+namespace acceptance.Dsl;
+
+// The base for each business domain's DSL: Todos now, Lists or Accounts later.
+// Every domain shares the spec's context, so a spec can act in one domain and
+// check the outcome from any of them.
+public abstract class DslBase(SpecContext context)
+{
+    protected Alias Alias => context.Alias;
+
+    protected DriverResult? LastResult => context.LastResult;
+
+    protected void Record(DriverResult result) => context.LastResult = result;
+
+    public Task ConfirmErrorIsShown(string message)
+    {
+        Assert.NotNull(context.LastResult);
+        Assert.True(context.LastResult.IsFailed, "Expected the last action to fail, but it succeeded.");
+        Assert.Equal(message, context.LastResult.Error);
+        return Task.CompletedTask;
+    }
+}
+```
+
+### Dsl/Todos/TodosDsl.cs
+
+The todo vocabulary. Specs reach it as `Todos`, so method names don't repeat the word. The DSL takes the whole channel and reaches each capability through it. If a spec uses an optional capability on a channel that doesn't have it, the error says how to fix the spec.
+
+```csharp
+using acceptance.Drivers.Channels;
+using acceptance.Drivers.Todos;
+
+namespace acceptance.Dsl.Todos;
+
+// The todo domain's vocabulary: everything a spec can say about todos.
+// Specs reach it as Todos, so methods don't repeat the word: Todos.Add("Buy milk").
+public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
+{
+    private ITodoDriver Driver => channel.Todos;
 
     private ITodoTextInputDriver TextInput => channel.TextInput
         ?? throw new InvalidOperationException(
             "This spec uses live text input, which this channel does not support. " +
             "Limit it to the channels that do, e.g. [Fact, Channels(Channel.Ui)].");
 
-    public Task AttemptToAddTodoWithTitleOfLength(int length) =>
-        AttemptToAddAliasedTodo(AliasedTitleOfLength(length));
+    public Task AttemptToAdd(string title) =>
+        AttemptToAddAliased(Alias.For(title));
 
-    public Task AttemptToAddTodo(string title) =>
-        AttemptToAddAliasedTodo(alias.For(title));
+    public Task AttemptToAddWithTitleOfLength(int length) =>
+        AttemptToAddAliased(AliasedTitleOfLength(length));
 
-    public async Task AddTodo(string title)
+    public async Task Add(string title)
     {
-        await AttemptToAddTodo(title);
-        _lastResult!.ShouldSucceed($"Could not add todo '{title}'");
+        await AttemptToAdd(title);
+        LastResult!.ShouldSucceed($"Could not add todo '{title}'");
     }
 
-    public async Task AttemptToCompleteTodo(string title) =>
-        _lastResult = await Todos.CompleteTodo(alias.For(title));
+    public async Task AttemptToComplete(string title) =>
+        Record(await Driver.CompleteTodo(Alias.For(title)));
 
-    public async Task CompleteTodo(string title)
+    public async Task Complete(string title)
     {
-        await AttemptToCompleteTodo(title);
-        _lastResult!.ShouldSucceed($"Could not complete todo '{title}'");
+        await AttemptToComplete(title);
+        LastResult!.ShouldSucceed($"Could not complete todo '{title}'");
     }
 
-    public Task ConfirmTodoIsShown(string title) =>
-        Todos.ConfirmTodoIsShown(alias.For(title));
+    public Task ConfirmShown(string title) =>
+        Driver.ConfirmTodoIsShown(Alias.For(title));
 
-    public Task ConfirmTodoIsComplete(string title) =>
-        Todos.ConfirmTodoIsComplete(alias.For(title));
-
-    public Task ConfirmErrorIsShown(string message)
-    {
-        Assert.NotNull(_lastResult);
-        Assert.True(_lastResult.IsFailed, "Expected the last action to fail, but it succeeded.");
-        Assert.Equal(message, _lastResult.Error);
-        return Task.CompletedTask;
-    }
+    public Task ConfirmComplete(string title) =>
+        Driver.ConfirmTodoIsComplete(Alias.For(title));
 
     // Live text input
 
-    public Task TypeTodoTitleOfLength(int length) =>
+    public Task TypeTitleOfLength(int length) =>
         TextInput.TypeTodoTitle(AliasedTitleOfLength(length));
 
     public Task ConfirmWarnedTitleIsTooLong() =>
@@ -689,25 +731,26 @@ public class UserDsl(IChannel channel, Alias alias)
 
     // Helpers
 
-    private async Task AttemptToAddAliasedTodo(string aliasedTitle) =>
-        _lastResult = await Todos.AddTodo(aliasedTitle);
+    private async Task AttemptToAddAliased(string aliasedTitle) =>
+        Record(await Driver.AddTodo(aliasedTitle));
 
     // The alias suffix counts towards the length, so the system sees exactly `length` characters.
     private string AliasedTitleOfLength(int length)
     {
         ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(length, Alias.SuffixLength);
-        return alias.For(new string('a', length - Alias.SuffixLength));
+        return Alias.For(new string('a', length - Alias.SuffixLength));
     }
 }
 ```
 
 ### Infrastructure/AcceptanceTestBase.cs
 
-Every spec class inherits from this. It builds the channel for this run and hands it to the DSL.
+Every spec class inherits from this. It builds the channel for this run and gives each domain's DSL the channel and the spec's shared context. A new domain adds one property here.
 
 ```csharp
 using Microsoft.Playwright;
 using acceptance.Dsl;
+using acceptance.Dsl.Todos;
 using acceptance.Drivers.Channels;
 
 namespace acceptance.Infrastructure;
@@ -720,7 +763,8 @@ public abstract class AcceptanceTestBase : IAsyncLifetime
     private IPlaywright? _playwright;
     private IBrowser? _browser;
 
-    protected UserDsl User { get; private set; } = null!;
+    // One property per business domain. Specs read like Todos.Add("Buy milk").
+    protected TodosDsl Todos { get; private set; } = null!;
 
     public async ValueTask InitializeAsync()
     {
@@ -730,7 +774,8 @@ public abstract class AcceptanceTestBase : IAsyncLifetime
             Channel.Ui => await CreateUiChannel(),
             var other => throw new InvalidOperationException($"No channel set up for {other}.")
         };
-        User = new UserDsl(channel, new Alias());
+        var context = new SpecContext();
+        Todos = new TodosDsl(channel, context);
     }
 
     private static IChannel CreateApiChannel() =>
@@ -1147,8 +1192,8 @@ public class AddingTodos : AcceptanceTestBase
     [Fact]
     public async Task UserCanAddATodo()
     {
-        await User.AddTodo("Buy milk");
-        await User.ConfirmTodoIsShown("Buy milk");
+        await Todos.Add("Buy milk");
+        await Todos.ConfirmShown("Buy milk");
     }
 }
 ```
@@ -1195,8 +1240,8 @@ Add a second spec to `AddingTodos.cs`:
 [Fact]
 public async Task CannotAddATodoWithoutATitle()
 {
-    await User.AttemptToAddTodo("");
-    await User.ConfirmErrorIsShown("A title is required");
+    await Todos.AttemptToAdd("");
+    await Todos.ConfirmErrorIsShown("A title is required");
 }
 ```
 
@@ -1227,9 +1272,9 @@ public class CompletingTodos : AcceptanceTestBase
     [Fact]
     public async Task UserCanCompleteATodo()
     {
-        await User.AddTodo("Walk the dog");
-        await User.CompleteTodo("Walk the dog");
-        await User.ConfirmTodoIsComplete("Walk the dog");
+        await Todos.Add("Walk the dog");
+        await Todos.Complete("Walk the dog");
+        await Todos.ConfirmComplete("Walk the dog");
     }
 }
 ```
@@ -1239,7 +1284,7 @@ Run the loop exactly as before.
 **Your turn: a feature where you design the contract.** Pick one, such as deleting a todo or rejecting a duplicate title. This time nothing exists yet, so work outside in:
 
 1. Write the spec first, using DSL methods that don't exist yet, phrased how you'd say it out loud.
-2. Add those methods to `UserDsl`.
+2. Add those methods to the domain's DSL, `TodosDsl`. A new area of the business gets its own DSL class and drivers instead.
 3. Add them to `ITodoDriver`, then decide the contract: which endpoint and status code for the API driver, which `data-testid` for the UI driver. Update the contract comments.
 4. Watch it fail on both channels for the right reason, commit, hand over.
 
@@ -1249,14 +1294,14 @@ Run the loop exactly as before.
 [Fact, Channels(Channel.Ui)]
 public async Task UserIsWarnedWhileTypingATitleLongerThan255Utf16Characters()
 {
-    await User.TypeTodoTitleOfLength(256);
-    await User.ConfirmWarnedTitleIsTooLong();
+    await Todos.TypeTitleOfLength(256);
+    await Todos.ConfirmWarnedTitleIsTooLong();
 }
 ```
 
 On the API run it is reported as skipped; on the UI run it fails until `title-too-long-warning` exists. Two rules keep single-channel specs honest:
 
-- **Split the rule from the feedback.** "A title can't be longer than 255 characters" is a business rule, so it belongs in a spec for every channel, using `AttemptToAddTodoWithTitleOfLength`. Only the warning while typing is UI-only. Otherwise the API would accept what the UI forbids.
+- **Split the rule from the feedback.** "A title can't be longer than 255 characters" is a business rule, so it belongs in a spec for every channel, using `Todos.AttemptToAddWithTitleOfLength`. Only the warning while typing is UI-only. Otherwise the API would accept what the UI forbids.
 - **New optional capabilities follow the same shape:** an interface in the domain folder, a nullable member with a `null` default in `IChannel.<Domain>.cs`, and a driver plus one line of wiring for each channel that supports it.
 
 This is where most of the real thinking lives, and where a spec agent earns its place: it can draft the spec, DSL and driver changes with you, and point out the decisions they force. You'll notice that writing the driver forces decisions a prose spec would leave vague.
