@@ -49,17 +49,18 @@ function Get-RoleContext([string]$role) {
         $lines += ""
     }
     if (Test-Unrestricted $role) {
-        $lines += "You may edit any file in the repo. Changes that cross role boundaries are reported to the human."
+        $lines += "You may edit any file in the repo. Changes that cross the other agents' boundaries are reported to the human."
     } else {
         $lines += "You may edit only: $(Get-OwnedList $role). Everything else is read-only for you, and hooks enforce it."
     }
 
     $template = $RolesConfig.templateBranch
     $branch = git branch --show-current
-    if ($template -and $role -eq 'tooling' -and $branch -ne $template) {
-        $lines += "", "Warning: tooling work belongs on the ``$template`` branch, but this worktree is on ``$branch``. Point this out to the human before changing anything."
+    $worksOnTemplate = (Get-Role $role).worksOnTemplate
+    if ($template -and $worksOnTemplate -eq $true -and $branch -ne $template) {
+        $lines += "", "Warning: your work belongs on the ``$template`` branch, but this worktree is on ``$branch``. Point this out to the human before changing anything."
     }
-    if ($template -and $role -in 'designer', 'implementer' -and $branch -eq $template) {
+    if ($template -and $worksOnTemplate -eq $false -and $branch -eq $template) {
         $lines += "", "Warning: this worktree is on the ``$template`` branch, which holds the template rather than a project. Point this out to the human before changing anything."
     }
     $lines += "", "State your role in your first reply."
@@ -129,9 +130,9 @@ switch ($Event) {
             Block "No role is set for this session, so files can't be changed. Tell the human to set one with set-role.ps1 and start a new session."
         }
         $owner = Get-Owner $repoPath
-        $ownedBy = if ($owner) { "belongs to the $owner role" } else { "isn't owned by any role" }
-        Block ("``$repoPath`` $ownedBy, and this session's role is $role. " +
-            "Don't try another way to change it. If the change is needed, stop and tell the human which role should make it.")
+        $ownedBy = if ($owner) { "belongs to $owner" } else { "isn't owned by any role" }
+        Block ("``$repoPath`` $ownedBy, and this session is $role. " +
+            "Don't try another way to change it. If the change is needed, stop and tell the human which agent should make it.")
     }
 
     'Stop' {
@@ -146,8 +147,10 @@ switch ($Event) {
         if (Test-Unrestricted $role) {
             $groups = $changed | Group-Object { $o = Get-Owner $_; if ($o) { $o } else { 'no role' } }
             $notes = @()
-            if ($groups.Count -gt 1 -or ($groups | Where-Object Name -in 'tooling', 'no role')) {
-                $notes += "This unrestricted turn changed files across roles:`n" +
+            # Report changes that span agents, touch unowned files, or touch the harness itself.
+            $harness = @(Get-RoleNames | Where-Object { (Get-Role $_).worksOnTemplate -eq $true })
+            if ($groups.Count -gt 1 -or ($groups | Where-Object { $_.Name -eq 'no role' -or $_.Name -in $harness })) {
+                $notes += "This $role turn changed files owned by other agents:`n" +
                     (($groups | ForEach-Object { "- $($_.Name): $($_.Group -join ', ')" }) -join "`n")
             }
             if ($roleWarning) { $notes += $roleWarning }
@@ -163,7 +166,7 @@ switch ($Event) {
 
         if ($hookInput.stop_hook_active) {
             # Already asked once. Let the turn end rather than loop, and warn the human.
-            $note = "Files outside the $role role changed during this turn and were not restored:`n" +
+            $note = "Files outside $role's files changed during this turn and were not restored:`n" +
                 ($violations -join "`n")
             if ($roleWarning) { $note += "`n`n$roleWarning" }
             Write-SystemMessage $note
@@ -173,7 +176,7 @@ switch ($Event) {
         # Files the human had already changed must not be restored with git, or their work is lost.
         $clean = @($violations | Where-Object { -not $session.state.Contains($_) })
         $dirty = @($violations | Where-Object { $session.state.Contains($_) })
-        $message = "You changed files outside the $role role during this turn. You must not change these."
+        $message = "You changed files outside $role's files during this turn. You must not change these."
         if ($clean) {
             $message += "`n`nUndo these with git restore (or delete them if you created them):`n" +
                 ($clean -join "`n")
@@ -184,7 +187,7 @@ switch ($Event) {
                 "the human's work:`n" + ($dirty -join "`n")
         }
         # A role-file warning is for the human; it's shown when the turn ends.
-        $message += "`n`nThen stop and tell the human which role should make the change."
+        $message += "`n`nThen stop and tell the human which agent should make the change."
         Block $message
     }
 }

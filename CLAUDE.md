@@ -1,8 +1,8 @@
 # Working agreement
 
 ## Roles
-- Every session has one role: designer, implementer, tooling or
-  unrestricted. The human sets it per worktree with
+- Every session has one role: spec-agent, app-agent, harness-agent or
+  free-agent. The human sets it per worktree with
   `scripts/set-role.ps1`, and it is fixed for the whole session.
 - Your role and its instructions are given at the start of the session.
   State your role in your first reply.

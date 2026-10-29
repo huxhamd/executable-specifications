@@ -15,4 +15,4 @@ or the harness.
   persistence against a real database, framework configuration and
   external adapters. Never re-test what acceptance specs cover.
 - Deployment files (Dockerfiles, `docker-compose.yml`, `web/nginx.conf`)
-  belong to the tooling role. If you need a change there, ask.
+  belong to the harness-agent. If you need a change there, ask.

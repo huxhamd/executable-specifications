@@ -5,7 +5,7 @@
 # the role of the last session started here.
 #
 #   pwsh -File scripts/set-role.ps1             shows the roles and the choices
-#   pwsh -File scripts/set-role.ps1 designer    sets the role for the next session
+#   pwsh -File scripts/set-role.ps1 spec-agent  sets the role for the next session
 #   pwsh -File scripts/set-role.ps1 none        clears it: new agent sessions can read
 #                                               and discuss, but not edit files
 param([string]$Role)
@@ -29,9 +29,13 @@ foreach ($name in $names) {
 
 if (-not $Role) {
     $active = Get-ActiveRole
+    $stored = if (Test-Path -LiteralPath (Get-RoleFilePath)) { (Get-Content -LiteralPath (Get-RoleFilePath) -Raw).Trim() }
+    if ($stored -and $stored -ne (Get-WorktreeRole)) {
+        Write-Host "This worktree is set to '$stored', which is no longer a role, so it counts as none."
+    }
     Write-Host "Next session:                 $(Get-WorktreeRole)"
     Write-Host "Last session started here:    $(if ($active) { $active } else { '(none yet)' })`n"
-    foreach ($name in $names) { Write-Host ("  {0,-13} {1}" -f $name, (Get-Role $name).summary) }
+    foreach ($name in $names) { Write-Host ("  {0,-14} {1}" -f $name, (Get-Role $name).summary) }
     Write-Host "`nSet one with: pwsh -File scripts/set-role.ps1 <role>"
     exit 0
 }

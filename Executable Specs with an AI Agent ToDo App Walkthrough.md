@@ -14,13 +14,13 @@ You own everything and review everything. The agent works in one of three roles 
 
 | Folder | What it holds | Agent role that may change it |
 | --- | --- | --- |
-| `acceptance/Specs` | The executable specifications | Designer |
-| `acceptance/Dsl` | The domain vocabulary the specs speak | Designer |
-| `acceptance/Drivers` | The contract: API routes and JSON, UI test IDs | Designer |
-| `api/`, `api.Tests/`, `web/` | The app and its unit tests | Implementer |
-| `acceptance/Infrastructure`, `scripts/`, `.claude/`, `CLAUDE.md`, deployment files, this guide | The harness, guardrails and deployable system | Tooling |
+| `acceptance/Specs` | The executable specifications | Spec agent |
+| `acceptance/Dsl` | The domain vocabulary the specs speak | Spec agent |
+| `acceptance/Drivers` | The contract: API routes and JSON, UI test IDs | Spec agent |
+| `api/`, `api.Tests/`, `web/` | The app and its unit tests | App agent |
+| `acceptance/Infrastructure`, `scripts/`, `.claude/`, `CLAUDE.md`, deployment files, this guide | The harness, guardrails and deployable system | Harness agent |
 
-A fourth role, unrestricted, exists for cross-cutting work. Step 5 sets all this up.
+A fourth role, the free agent, exists for cross-cutting work. Step 5 sets all this up.
 
 The drivers are where you make design decisions. They state which endpoints exist and which `data-testid` attributes the UI must expose, so the agent builds to your contract rather than inventing one.
 
@@ -763,10 +763,10 @@ So every Claude Code session has one **role**:
 
 | Role | May change | Typical work |
 | --- | --- | --- |
-| **Designer** | `acceptance/Specs`, `acceptance/Dsl`, `acceptance/Drivers` | Write specs with you, grow the DSL, design driver contracts, watch specs fail |
-| **Implementer** | `api/`, `api.Tests/`, `web/` | Make a committed, failing spec pass |
-| **Tooling** | The harness, scripts, Claude Code settings, deployment files and this guide | Improve the template, on the `template` branch |
-| **Unrestricted** | Anything | Cross-cutting work; changes that cross roles are reported to you |
+| **Spec agent** (`spec-agent`) | `acceptance/Specs`, `acceptance/Dsl`, `acceptance/Drivers` | Write specs with you, grow the DSL, design driver contracts, watch specs fail |
+| **App agent** (`app-agent`) | `api/`, `api.Tests/`, `web/` | Make a committed, failing spec pass |
+| **Harness agent** (`harness-agent`) | The harness, scripts, Claude Code settings, deployment files and this guide | Improve the template, on the `template` branch |
+| **Free agent** (`free-agent`) | Anything | Cross-cutting work; changes that cross the other agents' boundaries are reported to you |
 
 Every role can read everything and run the tests. The roles only limit the agent: your own edits are never blocked.
 
@@ -776,19 +776,19 @@ A role belongs to a **worktree**, and you set it in that worktree's terminal:
 
 ```powershell
 pwsh -File scripts/set-role.ps1             # shows the current role and the choices
-pwsh -File scripts/set-role.ps1 designer    # sets it
+pwsh -File scripts/set-role.ps1 spec-agent  # sets it
 pwsh -File scripts/set-role.ps1 none        # clears it
 ```
 
-Then start a new Claude Code session. A session keeps the role it started with until it ends, even if the role is changed meanwhile: `set-role.ps1` only sets the role for the *next* session. Run it with no argument to see both the next session's role and the role of the last session started in the worktree. Switching roles is always a fresh session, so nothing from a design conversation reaches the implementer. With no role set, the agent can read and discuss but not change anything, and it tells you how to set one.
+Then start a new Claude Code session. A session keeps the role it started with until it ends, even if the role is changed meanwhile: `set-role.ps1` only sets the role for the *next* session. Run it with no argument to see both the next session's role and the role of the last session started in the worktree. Switching roles is always a fresh session, so nothing from a spec conversation reaches the app agent. With no role set, the agent can read and discuss but not change anything, and it tells you how to set one.
 
-The role is kept in the worktree's private git folder, so it's never committed and each worktree has its own. To run a designer and an implementer side by side, give each its own worktree and open each in its own VS Code window:
+The role is kept in the worktree's private git folder, so it's never committed and each worktree has its own. To run a spec agent and an app agent side by side, give each its own worktree and open each in its own VS Code window:
 
 ```bash
 git worktree add ../todo-implement -b implement   # a second worktree on its own branch
 ```
 
-A branch can only be checked out in one worktree, so the implementer works on its own branch, which you merge back after review. Keep to one active Claude Code session per worktree, because each session judges changes in the working tree as its own.
+A branch can only be checked out in one worktree, so the app agent works on its own branch, which you merge back after review. Keep to one active Claude Code session per worktree, because each session judges changes in the working tree as its own.
 
 ### How the roles are enforced
 
@@ -796,7 +796,7 @@ Hooks enforce the roles, so they don't depend on the agent remembering them:
 
 - **At session start**, the role is locked for the session and the agent is given its role instructions. It states its role in its first reply.
 - **Before every edit**, an edit outside the role's files is blocked, as is any edit inside the git folder or in another worktree. Shell commands that mention the role settings, or that commit or push, are blocked too.
-- **When the agent finishes a turn**, anything changed during the turn that the role doesn't own is caught, including changes made through shell commands. The agent is told to undo them, taking care not to discard your own uncommitted work. If it doesn't, it is allowed to finish and you see a warning. Unrestricted sessions are never blocked, but you see what they changed across roles.
+- **When the agent finishes a turn**, anything changed during the turn that the role doesn't own is caught, including changes made through shell commands. The agent is told to undo them, taking care not to discard your own uncommitted work. If it doesn't, it is allowed to finish and you see a warning. Free-agent sessions are never blocked, but you see what they changed across the other agents' files.
 - **Before work counts as done**, `check-done.ps1` fails if any uncommitted change falls outside the role of the last session started in the worktree: the role the work was done under. A role set for the next session doesn't change how the work already in the tree is judged.
 
 An agent with a shell can always find *some* way to write a file, for example in another worktree through a shell command. The hooks block the obvious routes and catch the rest at the end of each turn; your review is the final gate. Each hook takes under a second, mostly PowerShell starting up.
@@ -812,8 +812,8 @@ The working agreement every session shares, whatever its role. Claude Code reads
 # Working agreement
 
 ## Roles
-- Every session has one role: designer, implementer, tooling or
-  unrestricted. The human sets it per worktree with
+- Every session has one role: spec-agent, app-agent, harness-agent or
+  free-agent. The human sets it per worktree with
   `scripts/set-role.ps1`, and it is fixed for the whole session.
 - Your role and its instructions are given at the start of the session.
   State your role in your first reply.
@@ -834,30 +834,34 @@ The working agreement every session shares, whatever its role. Claude Code reads
 
 **`.claude/roles.json`**
 
-The ownership table: the single source of truth for who may change what. A folder entry ends in `/`. When entries overlap, the most specific wins, which is how `api/Dockerfile` belongs to tooling while the rest of `api/` belongs to the implementer. A path in no entry belongs to nobody, so only an unrestricted session can change it; `set-role.ps1` refuses to run if two roles claim the same entry.
+The ownership table: the single source of truth for who may change what. A folder entry ends in `/`. When entries overlap, the most specific wins, which is how `api/Dockerfile` belongs to the harness agent while the rest of `api/` belongs to the app agent. A path in no entry belongs to nobody, so only a free agent can change it; `set-role.ps1` refuses to run if two roles claim the same entry. `worksOnTemplate` says whether an agent's work belongs on the `template` branch; the session start warns when a worktree's branch doesn't match.
 
 ```json
 {
   "templateBranch": "template",
+  "//": "worksOnTemplate: true = this agent's work belongs on the template branch; false = it doesn't; absent = either. The session start warns on a mismatch.",
   "roles": {
-    "designer": {
+    "spec-agent": {
       "summary": "Helps the human write executable specifications. Never implements.",
+      "worksOnTemplate": false,
       "owns": [
         "acceptance/Specs/",
         "acceptance/Dsl/",
         "acceptance/Drivers/"
       ]
     },
-    "implementer": {
+    "app-agent": {
       "summary": "Makes a committed, failing spec pass. Never touches specs or the harness.",
+      "worksOnTemplate": false,
       "owns": [
         "api/",
         "api.Tests/",
         "web/"
       ]
     },
-    "tooling": {
+    "harness-agent": {
       "summary": "Improves the harness and the template. Writes no specs or app code.",
+      "worksOnTemplate": true,
       "owns": [
         "acceptance/Infrastructure/",
         "acceptance/Todo.AcceptanceTests.csproj",
@@ -877,8 +881,8 @@ The ownership table: the single source of truth for who may change what. A folde
         "web/nginx.conf"
       ]
     },
-    "unrestricted": {
-      "summary": "No ownership limits, for cross-cutting work. Cross-role changes are reported.",
+    "free-agent": {
+      "summary": "No ownership limits, for cross-cutting work. Cross-agent changes are reported.",
       "unrestricted": true
     }
   }
@@ -887,7 +891,7 @@ The ownership table: the single source of truth for who may change what. A folde
 
 **`.claude/settings.json`**
 
-Wires the hooks up. `$CLAUDE_PROJECT_DIR` keeps them working if the agent changes directory. The `ask` rules mean even tooling and unrestricted sessions need your approval for each change to the enforcement itself.
+Wires the hooks up. `$CLAUDE_PROJECT_DIR` keeps them working if the agent changes directory. The `ask` rules mean even harness-agent and free-agent sessions need your approval for each change to the enforcement itself.
 
 ```json
 {
@@ -947,9 +951,9 @@ Wires the hooks up. `$CLAUDE_PROJECT_DIR` keeps them working if the agent change
 }
 ```
 
-**`.claude/roles/designer.md`**
+**`.claude/roles/spec-agent.md`**
 
-Role instructions, given to the agent at session start. The designer's job is to make specs good and to make them fail for the right reason.
+Role instructions, given to the agent at session start. The spec agent's job is to make specs good and to make them fail for the right reason.
 
 ```markdown
 You help the human write executable specifications. You never implement them.
@@ -971,12 +975,12 @@ You help the human write executable specifications. You never implement them.
   failing because the behaviour is missing, not because of broken plumbing.
 - Never make a spec pass. If a new spec already passes, say so.
 - When a spec is ready, tell the human to review and commit it. The
-  implementer works only from committed specs.
+  app-agent works only from committed specs.
 ```
 
-**`.claude/roles/implementer.md`**
+**`.claude/roles/app-agent.md`**
 
-The implementer works from the committed spec alone, with the testing rules that used to be in `CLAUDE.md`.
+The app agent works from the committed spec alone, with the testing rules that used to be in `CLAUDE.md`.
 
 ```markdown
 You make a committed, failing acceptance spec pass. You never change specs
@@ -996,19 +1000,19 @@ or the harness.
   persistence against a real database, framework configuration and
   external adapters. Never re-test what acceptance specs cover.
 - Deployment files (Dockerfiles, `docker-compose.yml`, `web/nginx.conf`)
-  belong to the tooling role. If you need a change there, ask.
+  belong to the harness-agent. If you need a change there, ask.
 ```
 
-**`.claude/roles/tooling.md`**
+**`.claude/roles/harness-agent.md`**
 
-Tooling changes the rules for every role, including itself, so its changes to the enforcement always ask first.
+The harness agent changes the rules for every role, including its own, so its changes to the enforcement always ask first.
 
 ```markdown
 You improve the harness and the template: the acceptance infrastructure,
 scripts, Claude Code settings, role definitions, deployment files and the
 guide. You don't write specs or app code.
 
-- Tooling work belongs on the `template` branch. Projects get it by
+- Your work belongs on the `template` branch. Projects get it by
   merging `template` in.
 - Changes to the enforcement itself (`.claude/settings.json`,
   `.claude/roles.json` and the role scripts) ask the human for approval
@@ -1021,7 +1025,7 @@ guide. You don't write specs or app code.
   folder, add it to `.claude/roles.json`.
 ```
 
-**`.claude/roles/unrestricted.md`**
+**`.claude/roles/free-agent.md`**
 
 The escape hatch. Use it for the odd cross-cutting change; if your team reaches for it often, the ownership table probably needs adjusting.
 
@@ -1041,7 +1045,7 @@ doesn't fit one role.
 
 **`.claude/skills/implement-spec/SKILL.md`**
 
-A Claude Code skill: the implementer's procedure for making a failing spec pass. It runs the readiness check for the spec you named, confirms the spec fails for the right reason, implements to the definition of done, and says when to stop and ask rather than push on. You start it with `/implement-spec <SpecName>`.
+A Claude Code skill: the app agent's procedure for making a failing spec pass. It runs the readiness check for the spec you named, confirms the spec fails for the right reason, implements to the definition of done, and says when to stop and ask rather than push on. You start it with `/implement-spec <SpecName>`.
 
 ```markdown
 ---
@@ -1051,7 +1055,7 @@ description: Make a failing acceptance spec pass. Use when asked to implement an
 
 # Implement a failing acceptance spec
 
-Only the implementer role uses this skill. If your session's role is
+Only the app-agent uses this skill. If your session's role is
 anything else, stop and tell the human.
 
 ## When to stop
@@ -1119,7 +1123,7 @@ On a real team the same checks run in CI, with a `CODEOWNERS` entry putting each
 
 This is the loop you'll repeat for every feature: write a spec, watch it fail, commit, hand it over, review.
 
-**1. Write the spec** in `acceptance/Specs/AddingTodos.cs`. Write this first one yourself. Later, a designer session can help: `pwsh -File scripts/set-role.ps1 designer`, start a session, and talk the feature through.
+**1. Write the spec** in `acceptance/Specs/AddingTodos.cs`. Write this first one yourself. Later, a spec agent can help: `pwsh -File scripts/set-role.ps1 spec-agent`, start a session, and talk the feature through.
 
 ```csharp
 using acceptance.Infrastructure;
@@ -1147,10 +1151,10 @@ The API run should fail at `AddTodo` with "Could not add todo 'Buy milk'" and a 
 
 **3. Commit the spec.** `git add -A && git commit -m "Spec: user can add a todo"`
 
-**4. Hand it to the agent.** Make this worktree an implementer, then start a new Claude Code session:
+**4. Hand it to the agent.** Make this worktree's role the app agent, then start a new Claude Code session:
 
 ```powershell
-pwsh -File scripts/set-role.ps1 implementer
+pwsh -File scripts/set-role.ps1 app-agent
 ```
 
 Give it something like:
@@ -1160,7 +1164,7 @@ Give it something like:
 is fine for now.
 ```
 
-The skill and the implementer's role instructions already tell it where the contract lives, what it may change and when it's done, so the prompt only needs the spec and any design steer.
+The skill and the app agent's role instructions already tell it where the contract lives, what it may change and when it's done, so the prompt only needs the spec and any design steer.
 
 **5. Review.**
 
@@ -1187,7 +1191,7 @@ Run `pwsh -File scripts/run-acceptance-tests.ps1`. Right now the app probably ac
 
 Note that `"A title is required"` pins the exact wording on purpose. The API must return it in the 400 body's `errors`, as the API driver's contract describes, and the UI must show it in `error-message`. If you'd rather not fix the wording, make the DSL method check only that *some* error was shown.
 
-Commit, then hand it over in a new implementer session:
+Commit, then hand it over in a new app-agent session:
 
 ```text
 /implement-spec CannotAddATodoWithoutATitle. Validate in the API; the
@@ -1242,7 +1246,7 @@ On the API run it is reported as skipped; on the UI run it fails until `title-to
 - **Split the rule from the feedback.** "A title can't be longer than 255 characters" is a business rule, so it belongs in a spec for every channel, using `AttemptToAddTodoWithTitleOfLength`. Only the warning while typing is UI-only. Otherwise the API would accept what the UI forbids.
 - **New optional capabilities follow the same shape:** an interface in the domain folder, a nullable member with a `null` default in `IChannel.<Domain>.cs`, and a driver plus one line of wiring for each channel that supports it.
 
-This is where most of the real thinking lives, and where a designer session earns its place: it can draft the spec, DSL and driver changes with you, and point out the decisions they force. You'll notice that writing the driver forces decisions a prose spec would leave vague.
+This is where most of the real thinking lives, and where a spec agent earns its place: it can draft the spec, DSL and driver changes with you, and point out the decisions they force. You'll notice that writing the driver forces decisions a prose spec would leave vague.
 
 ## Step 9: Prove the point
 
@@ -1250,7 +1254,7 @@ This is the payoff: big implementation changes with zero changes to `acceptance/
 
 1. **Swap the storage.** Ask the agent to replace in-memory storage with EF Core and SQLite, persisted in a Docker volume. Every spec should still pass untouched.
 2. **Restyle the UI.** Ask for a full visual redesign or a component library. The drivers rely only on test IDs, so the specs survive.
-3. **Test the lock.** Write a spec the app can't reasonably satisfy, such as an assertion with a typo in the expected message, and ask the agent to "make the build green". It should stop and flag the spec rather than edit it. If it tries anyway, the role hooks will block or catch it. Then try the opposite in a designer session: ask it to implement the feature its spec describes.
+3. **Test the lock.** Write a spec the app can't reasonably satisfy, such as an assertion with a typo in the expected message, and ask the agent to "make the build green". It should stop and flag the spec rather than edit it. If it tries anyway, the role hooks will block or catch it. Then try the opposite with a spec agent: ask it to implement the feature its spec describes.
 
 If a spec breaks during 1 or 2, look at why. It usually means the spec or driver leaked an implementation detail, which is exactly the feedback this approach is meant to give you.
 
@@ -1270,7 +1274,7 @@ If a spec breaks during 1 or 2, look at why. It usually means the spec or driver
 | The agent says no role is set, or every edit is blocked | Run `pwsh -File scripts/set-role.ps1 <role>` in this worktree, then start a new session |
 | The agent still has its old role | Sessions keep the role they started with; start a new session |
 | An edit is blocked as belonging to another role | Working as designed: use a session with that role, or add the path to `.claude/roles.json` if it's in the wrong role |
-| A new file is blocked as not owned by any role | Add it, or its folder, to the right role in `.claude/roles.json` (a tooling change) |
+| A new file is blocked as not owned by any role | Add it, or its folder, to the right role in `.claude/roles.json` (a harness-agent change) |
 | The agent is told it changed files outside its role | It changed one during its turn, perhaps through a shell command; it should undo that and explain why |
 | A "Files outside the … role changed" warning appears | The agent didn't undo a change after being told; review the diff and revert it yourself |
 | `check-protected-files.ps1` fails in `check-done.ps1` | An uncommitted change is outside the role of the last session started here, perhaps your own edit; commit or move it first |

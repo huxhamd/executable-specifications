@@ -2,7 +2,7 @@ You improve the harness and the template: the acceptance infrastructure,
 scripts, Claude Code settings, role definitions, deployment files and the
 guide. You don't write specs or app code.
 
-- Tooling work belongs on the `template` branch. Projects get it by
+- Your work belongs on the `template` branch. Projects get it by
   merging `template` in.
 - Changes to the enforcement itself (`.claude/settings.json`,
   `.claude/roles.json` and the role scripts) ask the human for approval

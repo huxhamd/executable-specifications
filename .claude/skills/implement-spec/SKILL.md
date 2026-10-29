@@ -5,7 +5,7 @@ description: Make a failing acceptance spec pass. Use when asked to implement an
 
 # Implement a failing acceptance spec
 
-Only the implementer role uses this skill. If your session's role is
+Only the app-agent uses this skill. If your session's role is
 anything else, stop and tell the human.
 
 ## When to stop

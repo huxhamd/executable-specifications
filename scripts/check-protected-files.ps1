@@ -29,8 +29,8 @@ if ($outside -and $role -eq 'none') {
 }
 if ($outside) {
     [Console]::Error.WriteLine(
-        "These uncommitted changes are outside the $role role's files ($source):`n$($outside -join "`n")")
+        "These uncommitted changes are outside $role's files ($source):`n$($outside -join "`n")")
     exit 1
 }
-Write-Host "Protected files intact: every change belongs to the $role role ($source)."
+Write-Host "Protected files intact: every change belongs to $role ($source)."
 exit 0
