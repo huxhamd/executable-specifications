@@ -2,8 +2,9 @@
 
 ## Roles
 - Every session has one role: spec-agent, app-agent, harness-agent or
-  free-agent. The human sets it per worktree with
-  `scripts/set-role.ps1`, and it is fixed for the whole session.
+  free-agent. The human sets it per worktree, with a role command such
+  as `/spec-agent` or with `scripts/set-role.ps1`, and it is fixed for
+  the whole session.
 - Your role and its instructions are given at the start of the session.
   State your role in your first reply.
 - `.claude/roles.json` says which files each role may edit, and hooks

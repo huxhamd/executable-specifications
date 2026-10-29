@@ -164,6 +164,51 @@ function Get-ChangedPaths($before, $after) {
         Where-Object { $before[$_] -ne $after[$_] })
 }
 
+# An error message if two roles claim the same path, otherwise $null.
+function Test-RolesTable {
+    $seen = @{}
+    foreach ($name in Get-RoleNames) {
+        foreach ($entry in @((Get-Role $name).owns)) {
+            if (-not $entry) { continue }
+            if ($seen.ContainsKey($entry)) {
+                return ".claude/roles.json gives '$entry' to both $($seen[$entry]) and $name."
+            }
+            $seen[$entry] = $name
+        }
+    }
+    $null
+}
+
+# Sets the role for this worktree's next session ('none' clears it).
+# Returns $null on success, or an error message.
+function Set-WorktreeRole([string]$role) {
+    $problem = Test-RolesTable
+    if ($problem) { return $problem }
+    if ($role -eq 'none') {
+        Remove-Item -LiteralPath (Get-RoleFilePath) -ErrorAction SilentlyContinue
+        return $null
+    }
+    if ($role -cnotin (Get-RoleNames)) {
+        return "Unknown role '$role'. Choose one of: $((Get-RoleNames) -join ', '), or none."
+    }
+    Set-Content -LiteralPath (Get-RoleFilePath) -Value $role
+    $null
+}
+
+# The worktree's roles, one per line. Pass the running session's role to include it.
+function Get-RoleStatus([string]$sessionRole) {
+    $lines = @()
+    $stored = if (Test-Path -LiteralPath (Get-RoleFilePath)) { (Get-Content -LiteralPath (Get-RoleFilePath) -Raw).Trim() }
+    if ($stored -and $stored -ne (Get-WorktreeRole)) {
+        $lines += "This worktree is set to '$stored', which is no longer a role, so it counts as none."
+    }
+    if ($sessionRole) { $lines += "This session:                 $sessionRole" }
+    $active = Get-ActiveRole
+    $lines += "Next session:                 $(Get-WorktreeRole)"
+    $lines += "Last session started here:    $(if ($active) { $active } else { '(none yet)' })"
+    $lines
+}
+
 function Get-OwnedList([string]$role) {
     (@((Get-Role $role).owns) | ForEach-Object { "``$_``" }) -join ', '
 }

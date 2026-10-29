@@ -772,15 +772,24 @@ Every role can read everything and run the tests. The roles only limit the agent
 
 ### Setting a role
 
-A role belongs to a **worktree**, and you set it in that worktree's terminal:
+A role belongs to a **worktree**. The quickest way to set it is from the Claude Code chat itself, where these commands tab-complete:
+
+| Command | What it does |
+| --- | --- |
+| `/spec-agent`, `/app-agent`, `/harness-agent`, `/free-agent` | Sets the role for the next session in this worktree |
+| `/role` | Shows this session's role, the next session's role and the last session's role |
+| `/role none` | Clears the role |
+
+Then type `/clear` to start a fresh session in that role. A session keeps the role it started with until it ends, even if the role is changed meanwhile: the commands only set the role for the *next* session, and `/clear` starts it.
+
+The role commands are handled by a hook that only runs on what you type, before the agent sees anything, so the agent can't change roles; it only repeats the result to you. Each command is a small file in `.claude/commands/`. The same is available in a terminal, which works without Claude Code:
 
 ```powershell
-pwsh -File scripts/set-role.ps1             # shows the current role and the choices
-pwsh -File scripts/set-role.ps1 spec-agent  # sets it
+pwsh -File scripts/set-role.ps1             # shows the roles and the choices
+pwsh -File scripts/set-role.ps1 spec-agent  # sets the role for the next session
 pwsh -File scripts/set-role.ps1 none        # clears it
 ```
-
-Then start a new Claude Code session. A session keeps the role it started with until it ends, even if the role is changed meanwhile: `set-role.ps1` only sets the role for the *next* session. Run it with no argument to see both the next session's role and the role of the last session started in the worktree. Switching roles is always a fresh session, so nothing from a spec conversation reaches the app agent. With no role set, the agent can read and discuss but not change anything, and it tells you how to set one.
+ Switching roles is always a fresh session, so nothing from a spec conversation reaches the app agent. With no role set, the agent can read and discuss but not change anything, and it tells you how to set one.
 
 The role is kept in the worktree's private git folder, so it's never committed and each worktree has its own. To run a spec agent and an app agent side by side, give each its own worktree and open each in its own VS Code window:
 
@@ -813,8 +822,9 @@ The working agreement every session shares, whatever its role. Claude Code reads
 
 ## Roles
 - Every session has one role: spec-agent, app-agent, harness-agent or
-  free-agent. The human sets it per worktree with
-  `scripts/set-role.ps1`, and it is fixed for the whole session.
+  free-agent. The human sets it per worktree, with a role command such
+  as `/spec-agent` or with `scripts/set-role.ps1`, and it is fixed for
+  the whole session.
 - Your role and its instructions are given at the start of the session.
   State your role in your first reply.
 - `.claude/roles.json` says which files each role may edit, and hooks
@@ -1023,6 +1033,8 @@ guide. You don't write specs or app code.
   update the guide to match.
 - Every path should belong to exactly one role. When you add a file or
   folder, add it to `.claude/roles.json`.
+- When you add or rename a role, add or rename its command in
+  `.claude/commands/` and its instructions in `.claude/roles/`.
 ```
 
 **`.claude/roles/free-agent.md`**
@@ -1095,7 +1107,7 @@ The scripts are PowerShell, so they run the same on Windows, macOS and Linux wit
 
 | Script | What it does |
 | --- | --- |
-| `scripts/set-role.ps1` | Sets the role for this worktree's next session, or shows it alongside the last session's role |
+| `scripts/set-role.ps1` | Sets the role for this worktree's next session, or shows the roles; the terminal version of the role commands |
 | `scripts/run-acceptance-tests.ps1` | Starts Docker if needed, deploys fresh containers, runs every spec on each channel |
 | `scripts/check-ready-to-implement.ps1` | Checks the tree is clean and the named spec is committed |
 | `scripts/check-done.ps1` | The definition of done: the protected-files check, all unit tests and all acceptance tests |
@@ -1123,7 +1135,7 @@ On a real team the same checks run in CI, with a `CODEOWNERS` entry putting each
 
 This is the loop you'll repeat for every feature: write a spec, watch it fail, commit, hand it over, review.
 
-**1. Write the spec** in `acceptance/Specs/AddingTodos.cs`. Write this first one yourself. Later, a spec agent can help: `pwsh -File scripts/set-role.ps1 spec-agent`, start a session, and talk the feature through.
+**1. Write the spec** in `acceptance/Specs/AddingTodos.cs`. Write this first one yourself. Later, a spec agent can help: type `/spec-agent`, then `/clear`, and talk the feature through.
 
 ```csharp
 using acceptance.Infrastructure;
@@ -1151,13 +1163,14 @@ The API run should fail at `AddTodo` with "Could not add todo 'Buy milk'" and a 
 
 **3. Commit the spec.** `git add -A && git commit -m "Spec: user can add a todo"`
 
-**4. Hand it to the agent.** Make this worktree's role the app agent, then start a new Claude Code session:
+**4. Hand it to the agent.** In Claude Code, make this worktree's role the app agent and start a fresh session:
 
-```powershell
-pwsh -File scripts/set-role.ps1 app-agent
+```text
+/app-agent
+/clear
 ```
 
-Give it something like:
+Then give it something like:
 
 ```text
 /implement-spec UserCanAddATodo. Keep it simple: in-memory storage
@@ -1271,8 +1284,9 @@ If a spec breaks during 1 or 2, look at why. It usually means the spec or driver
 | Old behaviour after the agent's changes | You started the stack by hand without `--build`; `scripts/run-acceptance-tests.ps1` always rebuilds |
 | A spec is reported as skipped | It's limited to other channels with `[Channels(...)]`, which is expected |
 | `check-ready-to-implement.ps1` fails | Commit everything, including the spec, and name the spec method exactly |
-| The agent says no role is set, or every edit is blocked | Run `pwsh -File scripts/set-role.ps1 <role>` in this worktree, then start a new session |
-| The agent still has its old role | Sessions keep the role they started with; start a new session |
+| The agent says no role is set, or every edit is blocked | Type `/<role>`, for example `/app-agent`, then `/clear` |
+| The agent still has its old role | Sessions keep the role they started with; type `/clear` to start a fresh one |
+| A role command only makes the agent suggest a terminal command | The role hook didn't run; check `.claude/settings.json` is in place and start a new session, or use `scripts/set-role.ps1` |
 | An edit is blocked as belonging to another role | Working as designed: use a session with that role, or add the path to `.claude/roles.json` if it's in the wrong role |
 | A new file is blocked as not owned by any role | Add it, or its folder, to the right role in `.claude/roles.json` (a harness-agent change) |
 | The agent is told it changed files outside its role | It changed one during its turn, perhaps through a shell command; it should undo that and explain why |

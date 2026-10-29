@@ -3,9 +3,11 @@
 #   SessionStart       Locks this worktree's role for the session, records it as
 #                      the worktree's active role, and gives the agent its role
 #                      instructions. Its output becomes context.
-#   UserPromptSubmit   Records the working tree, so the Stop hook can tell what
-#                      changed during the turn. Prints nothing unless something
-#                      is wrong: its output becomes context too.
+#   UserPromptSubmit   Handles the role commands (/spec-agent and so on, and /role),
+#                      which only the human can type. Records the working tree, so
+#                      the Stop hook can tell what changed during the turn. Its
+#                      output becomes context, so it prints only what the agent
+#                      should see.
 #   PreToolUse         Blocks file edits outside the role's files, edits inside
 #                      the git folder, role changes and commits.
 #   Stop               Checks what changed during the turn, including through
@@ -37,8 +39,8 @@ function Get-RoleContext([string]$role) {
         $lines += @(
             "No role is set for this worktree, so you can't change any files in it.",
             "You may read, explain and discuss. Before doing anything else, tell the human",
-            "that no role is set, and that they can set one with",
-            "``pwsh -File scripts/set-role.ps1 <role>`` and then start a new session.",
+            "that no role is set, and that they can set one by typing a role command such",
+            "as ``/app-agent`` and then ``/clear``, or with ``pwsh -File scripts/set-role.ps1 <role>``.",
             "Roles: $((Get-RoleNames) -join ', ').")
         return $lines -join "`n"
     }
@@ -71,7 +73,8 @@ switch ($Event) {
 
     'SessionStart' {
         # Fires again on resume and after compaction: keep the role the session started with.
-        if (-not $session) {
+        # /clear starts a fresh conversation, so it picks up the worktree's role afresh.
+        if (-not $session -or $hookInput.source -eq 'clear') {
             $session = [pscustomobject]@{
                 role     = Get-WorktreeRole
                 roleFile = Get-RoleFileHash
@@ -86,6 +89,36 @@ switch ($Event) {
     }
 
     'UserPromptSubmit' {
+        # Role commands. This hook only runs for prompts the human submits, so the
+        # agent can't trigger them. Recognise the typed command, or the marker in
+        # the command file in case the prompt arrives expanded.
+        $prompt = [string]$hookInput.prompt
+        $command = $null
+        if ($prompt -match '^\s*/([\w-]+)(?:\s+([\w-]+))?\s*$') {
+            $command = @($Matches[1], $Matches[2])
+        } elseif ($prompt -match '<!--\s*role-command:\s*([\w-]+)(?:\s+([\w-]+))?\s*-->') {
+            $command = @($Matches[1], $Matches[2])
+        }
+        if ($command -and ($command[0] -eq 'role' -or $command[0] -cin (Get-RoleNames))) {
+            $sessionRole = if ($session) { $session.role } else { 'none' }
+            $wanted = if ($command[0] -eq 'role') { $command[1] } else { $command[0] }
+            $result = @("Role command result. Relay this to the human, briefly, and do nothing else.", "")
+            if ($wanted) {
+                $problem = Set-WorktreeRole $wanted
+                if ($problem) {
+                    $result += $problem
+                } elseif ($wanted -eq 'none') {
+                    $result += "Role cleared for the next session in this worktree. This session stays $sessionRole."
+                } else {
+                    $result += "The next session in this worktree will be $wanted. This session stays $sessionRole."
+                    $result += "Type /clear to start a fresh session as $wanted."
+                }
+                $result += ""
+            }
+            $result += Get-RoleStatus $sessionRole
+            $result -join "`n"
+        }
+
         if (-not $session) {
             # The hooks were installed after this session started. Fail closed.
             $session = [pscustomobject]@{ role = 'none'; roleFile = ''; state = $null }
@@ -127,7 +160,7 @@ switch ($Event) {
         if (Test-MayEdit $role $repoPath) { exit 0 }
 
         if ($role -eq 'none') {
-            Block "No role is set for this session, so files can't be changed. Tell the human to set one with set-role.ps1 and start a new session."
+            Block "No role is set for this session, so files can't be changed. Tell the human to type a role command such as /app-agent, then /clear."
         }
         $owner = Get-Owner $repoPath
         $ownedBy = if ($owner) { "belongs to $owner" } else { "isn't owned by any role" }
