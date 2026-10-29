@@ -1,0 +1,50 @@
+{
+  "templateBranch": "template",
+  "//": "worksOnTemplate: true = this agent's work belongs on the template branch; false = it doesn't; absent = either. The session start warns on a mismatch.",
+  "roles": {
+    "spec-agent": {
+      "summary": "Helps the human write executable specifications. Never implements.",
+      "worksOnTemplate": false,
+      "owns": [
+        "acceptance/Specs/",
+        "acceptance/Dsl/",
+        "acceptance/Drivers/"
+      ]
+    },
+    "app-agent": {
+      "summary": "Makes a committed, failing spec pass. Never touches specs or the harness.",
+      "worksOnTemplate": false,
+      "owns": [
+        "api/",
+        "api.Tests/",
+        "web/"
+      ]
+    },
+    "harness-agent": {
+      "summary": "Improves the harness and the template. Writes no specs or app code.",
+      "worksOnTemplate": true,
+      "owns": [
+        "acceptance/Infrastructure/",
+        "acceptance/Todo.AcceptanceTests.csproj",
+        ".claude/",
+        "scripts/",
+        "CLAUDE.md",
+        "README.md",
+        "Executable Specs with an AI Agent ToDo App Walkthrough.md",
+        ".editorconfig",
+        ".gitattributes",
+        ".gitignore",
+        "docker-compose.yml",
+        "api/Dockerfile",
+        "api/.dockerignore",
+        "web/Dockerfile",
+        "web/.dockerignore",
+        "web/nginx.conf"
+      ]
+    },
+    "free-agent": {
+      "summary": "No ownership limits, for cross-cutting work. Cross-agent changes are reported.",
+      "unrestricted": true
+    }
+  }
+}
