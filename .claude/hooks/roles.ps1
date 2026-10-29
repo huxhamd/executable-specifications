@@ -1,11 +1,13 @@
-# Shared by the role hooks, set-role.ps1 and check-protected-files.ps1.
-# Dot-source it: . "$PSScriptRoot/roles.ps1"
+# Shared by the role hooks, scripts/set-role.ps1 and scripts/check-protected-files.ps1.
+# Dot-source it: . "$PSScriptRoot/roles.ps1" from this folder, or
+# . "$PSScriptRoot/../.claude/hooks/roles.ps1" from scripts/.
 #
 # Each worktree has one role, kept in its private git folder (never committed).
 # Each Claude Code session locks the role it started with, in a session record
 # next to it. .claude/roles.json says which files each role may edit.
 
-$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
+# This file lives in .claude/hooks, two levels below the repo root.
+$RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 Set-Location $RepoRoot
 
 $RolesConfig = Get-Content -LiteralPath (Join-Path $RepoRoot '.claude/roles.json') -Raw |

@@ -10,7 +10,7 @@
 #                                               and discuss, but not edit files
 param([string]$Role)
 
-. "$PSScriptRoot/roles.ps1"
+. "$PSScriptRoot/../.claude/hooks/roles.ps1"
 
 $names = Get-RoleNames
 

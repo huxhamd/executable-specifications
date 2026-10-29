@@ -895,8 +895,8 @@ Wires the hooks up. `$CLAUDE_PROJECT_DIR` keeps them working if the agent change
     "ask": [
         "Edit(/.claude/settings.json)",
         "Edit(/.claude/roles.json)",
-        "Edit(/scripts/roles.ps1)",
-        "Edit(/scripts/role-hooks.ps1)",
+        "Edit(/.claude/hooks/roles.ps1)",
+        "Edit(/.claude/hooks/role-hooks.ps1)",
         "Edit(/scripts/set-role.ps1)",
         "Edit(/scripts/check-protected-files.ps1)"
     ]
@@ -907,7 +907,7 @@ Wires the hooks up. `$CLAUDE_PROJECT_DIR` keeps them working if the agent change
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/scripts/role-hooks.ps1\" -Event SessionStart"
+            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/role-hooks.ps1\" -Event SessionStart"
           }
         ]
       }
@@ -917,7 +917,7 @@ Wires the hooks up. `$CLAUDE_PROJECT_DIR` keeps them working if the agent change
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/scripts/role-hooks.ps1\" -Event UserPromptSubmit"
+            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/role-hooks.ps1\" -Event UserPromptSubmit"
           }
         ]
       }
@@ -928,7 +928,7 @@ Wires the hooks up. `$CLAUDE_PROJECT_DIR` keeps them working if the agent change
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/scripts/role-hooks.ps1\" -Event PreToolUse"
+            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/role-hooks.ps1\" -Event PreToolUse"
           }
         ]
       }
@@ -938,7 +938,7 @@ Wires the hooks up. `$CLAUDE_PROJECT_DIR` keeps them working if the agent change
         "hooks": [
           {
             "type": "command",
-            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/scripts/role-hooks.ps1\" -Event Stop"
+            "command": "pwsh -NoProfile -File \"$CLAUDE_PROJECT_DIR/.claude/hooks/role-hooks.ps1\" -Event Stop"
           }
         ]
       }
@@ -1087,15 +1087,22 @@ change broke the build, undo that change only.
 
 The scripts are PowerShell, so they run the same on Windows, macOS and Linux with `pwsh`. They're in the template repository; they're too long to type in, but worth reading.
 
+`scripts/` holds only things you run, so it reads as a list of what you can do. The agent uses some of them too:
+
 | Script | What it does |
 | --- | --- |
 | `scripts/set-role.ps1` | Sets the role for this worktree's next session, or shows it alongside the last session's role |
-| `scripts/role-hooks.ps1` | The four hooks that enforce the session's role |
-| `scripts/roles.ps1` | Shared by the role scripts: reads `roles.json`, works out who owns a path, tracks what changed |
-| `scripts/check-protected-files.ps1` | Fails if an uncommitted change is outside the role of the last session started here |
 | `scripts/run-acceptance-tests.ps1` | Starts Docker if needed, deploys fresh containers, runs every spec on each channel |
 | `scripts/check-ready-to-implement.ps1` | Checks the tree is clean and the named spec is committed |
 | `scripts/check-done.ps1` | The definition of done: the protected-files check, all unit tests and all acceptance tests |
+| `scripts/check-protected-files.ps1` | Fails if an uncommitted change is outside the role of the last session started here |
+
+The machinery only Claude Code runs lives beside the settings that wire it up:
+
+| Script | What it does |
+| --- | --- |
+| `.claude/hooks/role-hooks.ps1` | The four hooks that enforce the session's role |
+| `.claude/hooks/roles.ps1` | Shared by the hooks and the role scripts: reads `roles.json`, works out who owns a path, tracks what changed |
 
 `run-acceptance-tests.ps1` uses `--force-recreate`, so every run gets fresh containers and data doesn't build up across runs. Within a run both channels share one system, which is fine because aliasing keeps specs apart. If Docker isn't running, it starts Docker Desktop and waits; to avoid the wait, turn on *Start Docker Desktop when you sign in* in Docker Desktop's general settings.
 

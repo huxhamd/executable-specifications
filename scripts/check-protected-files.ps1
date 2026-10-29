@@ -6,7 +6,7 @@
 # It deliberately ignores a role set with set-role.ps1 since then: that role
 # applies to the next session, not to the work already here.
 
-. "$PSScriptRoot/roles.ps1"
+. "$PSScriptRoot/../.claude/hooks/roles.ps1"
 
 $role = Get-ActiveRole
 $source = "the role of the last session started here"
