@@ -1,7 +1,8 @@
-using acceptance.Drivers.Channels;
-using acceptance.Drivers.Todos;
+using acceptance.Core.Spec;
+using acceptance.Core.Spec.Channels;
+using acceptance.Todos.Drivers;
 
-namespace acceptance.Dsl.Todos;
+namespace acceptance.Todos.Dsl;
 
 // The todo domain's vocabulary: everything a spec can say about todos.
 // Specs reach it as Todos, so methods don't repeat the word: Todos.Add("Buy milk").

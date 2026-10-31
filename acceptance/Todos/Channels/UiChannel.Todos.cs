@@ -1,7 +1,7 @@
-using acceptance.Drivers.Todos;
+using acceptance.Todos.Drivers;
 
-// Part of UiChannel (see Drivers/Channels/UiChannel.cs), so it shares that namespace.
-namespace acceptance.Drivers.Channels;
+// Part of UiChannel (see Core/Spec/Channels/UiChannel.cs), so it shares that namespace.
+namespace acceptance.Core.Spec.Channels;
 
 public partial class UiChannel
 {

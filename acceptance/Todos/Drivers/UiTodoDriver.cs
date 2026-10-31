@@ -1,8 +1,9 @@
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
+using acceptance.Core.Spec;
 
-namespace acceptance.Drivers.Todos;
+namespace acceptance.Todos.Drivers;
 
 // UI contract (data-testid attributes):
 //   new-todo-title     text input for a new todo's title

@@ -1,6 +1,4 @@
-using acceptance.Drivers;
-
-namespace acceptance.Dsl;
+namespace acceptance.Core.Spec;
 
 // The base for each business domain's DSL: Todos now, Lists or Accounts later.
 // Every domain shares the spec's context, so a spec can act in one domain and
@@ -16,7 +14,7 @@ public abstract class DslBase(SpecContext context)
     protected static T Require<T>(T? capability, string description) where T : class =>
         capability ?? throw new InvalidOperationException(
             $"This spec uses {description}, which this channel does not support. " +
-            "Limit it to the channels that do, e.g. [Fact, Channels(Channel.Ui)].");
+            "Limit it to the channels that do, e.g. [Fact, Channels(ChannelType.Ui)].");
 
     public Task ConfirmErrorIsShown(string message)
     {

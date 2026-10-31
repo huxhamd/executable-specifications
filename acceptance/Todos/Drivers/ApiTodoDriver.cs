@@ -1,6 +1,7 @@
 using System.Net.Http.Json;
+using acceptance.Core.Spec;
 
-namespace acceptance.Drivers.Todos;
+namespace acceptance.Todos.Drivers;
 
 // API contract:
 //   GET    /api/todos                  -> 200 [{ id, title, completed }]

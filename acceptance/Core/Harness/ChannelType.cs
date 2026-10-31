@@ -1,11 +1,11 @@
-namespace acceptance.Infrastructure;
+namespace acceptance.Core.Harness;
 
-public enum Channel { Api, Ui }
+public enum ChannelType { Api, Ui }
 
 // The channel this run drives the system through, from ACCEPTANCE_CHANNEL.
 public static class AcceptanceChannel
 {
-    public static Channel Current
+    public static ChannelType Current
     {
         get
         {
@@ -14,8 +14,8 @@ public static class AcceptanceChannel
                 ?.Trim().ToLowerInvariant();
             return value switch
             {
-                "api" => Channel.Api,
-                "ui" => Channel.Ui,
+                "api" => ChannelType.Api,
+                "ui" => ChannelType.Ui,
                 null or "" => throw new InvalidOperationException(
                     "Set ACCEPTANCE_CHANNEL to 'api' or 'ui' before running the acceptance tests."),
                 _ => throw new InvalidOperationException(

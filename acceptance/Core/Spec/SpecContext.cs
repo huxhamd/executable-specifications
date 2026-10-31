@@ -1,6 +1,4 @@
-using acceptance.Drivers;
-
-namespace acceptance.Dsl;
+namespace acceptance.Core.Spec;
 
 // What one spec carries across every domain's DSL: its aliases, and the
 // outcome of its last action, whichever domain that action was in.
