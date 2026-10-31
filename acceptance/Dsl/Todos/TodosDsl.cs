@@ -9,10 +9,8 @@ public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
 {
     private ITodoDriver Driver => channel.Todos;
 
-    private ITodoTextInputDriver TextInput => channel.TextInput
-        ?? throw new InvalidOperationException(
-            "This spec uses live text input, which this channel does not support. " +
-            "Limit it to the channels that do, e.g. [Fact, Channels(Channel.Ui)].");
+    private ITodoTextInputDriver TextInput =>
+        Require(channel.TextInput, "live text input");
 
     public Task AttemptToAdd(string title) =>
         AttemptToAddAliased(Alias.For(title));
