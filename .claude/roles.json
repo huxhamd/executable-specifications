@@ -6,9 +6,7 @@
       "summary": "Helps the human write executable specifications. Never implements.",
       "worksOnTemplate": false,
       "owns": [
-        "acceptance/Specs/",
-        "acceptance/Dsl/",
-        "acceptance/Drivers/"
+        "acceptance/"
       ]
     },
     "app-agent": {
@@ -24,7 +22,7 @@
       "summary": "Improves the harness and the template. Writes no specs or app code.",
       "worksOnTemplate": true,
       "owns": [
-        "acceptance/Infrastructure/",
+        "acceptance/Core/Harness/",
         "acceptance/Todo.AcceptanceTests.csproj",
         ".claude/",
         "scripts/",

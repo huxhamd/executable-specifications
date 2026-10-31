@@ -1,7 +1,8 @@
-using acceptance.Drivers.Channels;
-using acceptance.Drivers.Todos;
+using acceptance.Core.Spec;
+using acceptance.Core.Spec.Channels;
+using acceptance.Todos.Drivers;
 
-namespace acceptance.Dsl.Todos;
+namespace acceptance.Todos.Dsl;
 
 // The todo domain's vocabulary: everything a spec can say about todos.
 // Specs reach it as Todos, so methods don't repeat the word: Todos.Add("Buy milk").
@@ -9,10 +10,8 @@ public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
 {
     private ITodoDriver Driver => channel.Todos;
 
-    private ITodoTextInputDriver TextInput => channel.TextInput
-        ?? throw new InvalidOperationException(
-            "This spec uses live text input, which this channel does not support. " +
-            "Limit it to the channels that do, e.g. [Fact, Channels(Channel.Ui)].");
+    private ITodoTextInputDriver TextInput =>
+        Require(channel.TextInput, "live text input");
 
     public Task AttemptToAdd(string title) =>
         AttemptToAddAliased(Alias.For(title));

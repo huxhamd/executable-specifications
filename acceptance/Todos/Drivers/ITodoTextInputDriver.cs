@@ -1,4 +1,4 @@
-namespace acceptance.Drivers.Todos;
+namespace acceptance.Todos.Drivers;
 
 // Live feedback while a todo's title is being entered, before it is submitted.
 public interface ITodoTextInputDriver

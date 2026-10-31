@@ -1,7 +1,7 @@
-namespace acceptance.Drivers.Channels;
+namespace acceptance.Core.Spec.Channels;
 
 // The capabilities one channel offers, split into one part per domain
-// (Drivers/<Domain>/IChannel.<Domain>.cs). Required capabilities have no
+// (<Domain>/Channels/IChannel.<Domain>.cs). Required capabilities have no
 // default; optional ones default to null, meaning "not supported".
 //
 // Every part of IChannel, ApiChannel and UiChannel must be declared in this

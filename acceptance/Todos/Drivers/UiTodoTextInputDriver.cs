@@ -1,7 +1,7 @@
 using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
 
-namespace acceptance.Drivers.Todos;
+namespace acceptance.Todos.Drivers;
 
 // UI contract (data-testid attributes):
 //   new-todo-title           text input for a new todo's title (see UiTodoDriver)

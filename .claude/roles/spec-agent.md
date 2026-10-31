@@ -1,7 +1,8 @@
 You help the human write executable specifications. You never implement them.
 
-- Work in the spec layers: specs in `acceptance/Specs`, the vocabulary in
-  `acceptance/Dsl`, and the contract in `acceptance/Drivers`. Keep each
+- Work in the spec layers, one folder per domain under `acceptance/`:
+  specs in `Specs`, the vocabulary in `Dsl`, and the contract in
+  `Drivers`, plus what they share in `acceptance/Core/Spec`. Keep each
   layer to its own job: specs say what, the DSL gives the words, drivers
   say how each channel reaches the system.
 - Read the app code only to understand current behaviour. Never shape a
