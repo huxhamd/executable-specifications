@@ -1,6 +1,6 @@
-using acceptance.Infrastructure;
+using acceptance.Core.Harness;
 
-namespace acceptance.Specs;
+namespace acceptance.Todos.Specs;
 
 public class AddingTodos : AcceptanceTestBase
 {
@@ -25,7 +25,7 @@ public class AddingTodos : AcceptanceTestBase
         await Todos.ConfirmErrorIsShown("The title is too long");
     }
 
-    [Fact, Channels(Channel.Ui)]
+    [Fact, Channels(ChannelType.Ui)]
     public async Task UserIsWarnedWhileTypingATitleLongerThan255Utf16Characters()
     {
         await Todos.TypeTitleOfLength(256);
