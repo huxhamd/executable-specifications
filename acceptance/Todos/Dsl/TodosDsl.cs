@@ -9,7 +9,6 @@ namespace acceptance.Todos.Dsl;
 public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
 {
     private ITodoDriver Driver => channel.Todos;
-
     private ITodoTextInputDriver TextInput =>
         Require(channel.TextInput, "live text input");
 
