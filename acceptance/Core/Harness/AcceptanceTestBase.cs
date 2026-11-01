@@ -4,8 +4,8 @@ using acceptance.Core.Spec.Channels;
 
 namespace acceptance.Core.Harness;
 
-// The base for every spec. Each business domain adds its DSL as one part
-// (<Domain>/Dsl/AcceptanceTestBase.<Domain>.cs), so specs read like
+// The base for every spec. Each business domain adds its DSL as one part,
+// next to its specs (<Domain>/Specs/AcceptanceTestBase.<Domain>.cs), so specs read like
 // Todos.Add("Buy milk"). Every part must be declared in this namespace,
 // whatever folder it lives in. A part in another namespace is silently a
 // different type.
