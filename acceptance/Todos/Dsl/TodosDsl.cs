@@ -1,4 +1,4 @@
-using acceptance.Core.Spec;
+using acceptance.Core.Spec.Dsl;
 using acceptance.Core.Spec.Channels;
 using acceptance.Todos.Drivers;
 

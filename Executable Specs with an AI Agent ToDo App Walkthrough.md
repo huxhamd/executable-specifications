@@ -153,10 +153,12 @@ acceptance/
       ChannelsAttribute.cs      limits a spec to some channels
       AcceptanceTestBase.cs     builds the channel and the spec's context
     Spec/                       the shared spec layers (spec agent)
-      Alias.cs                  unique names per test
-      DriverResult.cs           what a driver action did
-      SpecContext.cs            what a spec shares across domains
-      DslBase.cs                the base for each domain's DSL
+      Dsl/
+        DslBase.cs              the base for each domain's DSL
+        Alias.cs                unique names per test
+        SpecContext.cs          what a spec shares across domains
+      Drivers/
+        DriverResult.cs         what a driver action did
       Channels/                 one class per way of reaching the system
         IChannel.cs
         ApiChannel.cs
@@ -177,7 +179,7 @@ acceptance/
       AcceptanceTestBase.Todos.cs   gives specs the Todos property
 ```
 
-`Core/` holds everything that isn't about one domain, split by the role that owns it. Every other top-level folder is a domain (`Todos/`, later perhaps `Lists/`), and holds everything about that domain: its drivers, its parts of the channel classes, its vocabulary and its specs. Adding a domain is adding one folder.
+`Core/` holds everything that isn't about one domain, split by the role that owns it. Within `Core/Spec/`, files are grouped by layer, mirroring the domain folders: `DslBase` sits in `Core/Spec/Dsl/` as `TodosDsl` sits in `Todos/Dsl/`. Every other top-level folder is a domain (`Todos/`, later perhaps `Lists/`), and holds everything about that domain: its drivers, its parts of the channel classes, its vocabulary and its specs. Adding a domain is adding one folder.
 A **channel** is one way of reaching the whole system: the public API or the browser. Its driver interfaces are split by domain and by **capability**. A capability every channel must support, like `ITodoDriver`, is required. One only some channels support, like `ITodoEntryDriver` (live feedback while a new todo is being entered, which only a browser has), is optional: channels that don't support it simply don't mention it. Each channel has one driver class per domain, implementing every capability it supports, so `UiTodoDriver` implements both.
 
 ### Core/Harness/ChannelType.cs
@@ -238,12 +240,12 @@ public sealed class ChannelsAttribute(params ChannelType[] channels) : BeforeAft
 }
 ```
 
-### Core/Spec/Alias.cs
+### Core/Spec/Dsl/Alias.cs
 
 Every test gets its own suffix, so "Buy milk" becomes "Buy milk_3f9a1c". Tests never see each other's data, so there's no database reset and they can run in parallel, even against a system already full of data. Blank names stay blank, so you can still test empty input. `SuffixLength` lets the DSL build titles of an exact length, alias included.
 
 ```csharp
-namespace acceptance.Core.Spec;
+namespace acceptance.Core.Spec.Dsl;
 
 public class Alias
 {
@@ -255,12 +257,12 @@ public class Alias
 }
 ```
 
-### Core/Spec/DriverResult.cs
+### Core/Spec/Drivers/DriverResult.cs
 
 Drivers report what happened instead of throwing. The DSL decides whether that outcome was expected. The `TryCatchAsync` helpers turn an exception a driver expects, such as a Playwright timeout, into a failed result.
 
 ```csharp
-namespace acceptance.Core.Spec;
+namespace acceptance.Core.Spec.Drivers;
 
 public record DriverResult(bool IsFailed, string Error = "")
 {
@@ -369,14 +371,16 @@ namespace acceptance.Core.Spec.Channels;
 public partial class UiChannel(IPage page) : IChannel;
 ```
 
-### Core/Spec/SpecContext.cs
+### Core/Spec/Dsl/SpecContext.cs
 
 The DSL is organised by **business domain**, not by who is acting: specs say `Todos.Add("Buy milk")`, and later perhaps `Lists.Create(...)` or `Accounts.Register("user: Alice")`. People are data, aliased like everything else, not objects. Each domain's DSL mirrors that domain's drivers, so no single DSL class grows to hold every domain's vocabulary.
 
 Some state belongs to the spec, not to a domain: its aliases, and the outcome of its last action. Every domain's DSL shares this one context.
 
 ```csharp
-namespace acceptance.Core.Spec;
+using acceptance.Core.Spec.Drivers;
+
+namespace acceptance.Core.Spec.Dsl;
 
 // What one spec carries across every domain's DSL: its aliases, and the
 // outcome of its last action, whichever domain that action was in.
@@ -387,12 +391,14 @@ public class SpecContext
 }
 ```
 
-### Core/Spec/DslBase.cs
+### Core/Spec/Dsl/DslBase.cs
 
 What every domain's DSL has in common. Each action comes in two forms: `Add` must succeed and fails the test on that line if it doesn't, while `AttemptToAdd` just tries and records the outcome, so the next line can check that the rejection was the right one. `ConfirmErrorIsShown` checks that outcome, whichever domain the action was in. Confirmations are always lines of their own.
 
 ```csharp
-namespace acceptance.Core.Spec;
+using acceptance.Core.Spec.Drivers;
+
+namespace acceptance.Core.Spec.Dsl;
 
 // The base for each business domain's DSL: Todos now, Lists or Accounts later.
 // Every domain shares the spec's context, so a spec can act in one domain and
@@ -426,7 +432,7 @@ Every spec class inherits from this. It builds the channel for this run and the 
 
 ```csharp
 using Microsoft.Playwright;
-using acceptance.Core.Spec;
+using acceptance.Core.Spec.Dsl;
 using acceptance.Core.Spec.Channels;
 
 namespace acceptance.Core.Harness;
@@ -484,7 +490,7 @@ public abstract partial class AcceptanceTestBase : IAsyncLifetime
 The required todo capability: every channel implements it. The domain is in the type name, so method names don't repeat it.
 
 ```csharp
-using acceptance.Core.Spec;
+using acceptance.Core.Spec.Drivers;
 
 namespace acceptance.Todos.Drivers;
 
@@ -521,7 +527,7 @@ The comment at the top is the API contract. You've just designed the endpoints; 
 
 ```csharp
 using System.Net.Http.Json;
-using acceptance.Core.Spec;
+using acceptance.Core.Spec.Drivers;
 
 namespace acceptance.Todos.Drivers;
 
@@ -586,7 +592,7 @@ This comment is the UI contract: the `data-testid` attributes Angular must expos
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
-using acceptance.Core.Spec;
+using acceptance.Core.Spec.Drivers;
 
 namespace acceptance.Todos.Drivers;
 
@@ -738,7 +744,7 @@ public partial class UiChannel
 The todo vocabulary. Specs reach it as `Todos`, so method names don't repeat the word. The DSL takes the whole channel and reaches each capability through it. If a spec uses an optional capability on a channel that doesn't have it, the error says how to fix the spec.
 
 ```csharp
-using acceptance.Core.Spec;
+using acceptance.Core.Spec.Dsl;
 using acceptance.Core.Spec.Channels;
 using acceptance.Todos.Drivers;
 

@@ -1,7 +1,7 @@
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using static Microsoft.Playwright.Assertions;
-using acceptance.Core.Spec;
+using acceptance.Core.Spec.Drivers;
 
 namespace acceptance.Todos.Drivers;
 

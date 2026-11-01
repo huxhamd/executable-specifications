@@ -1,5 +1,5 @@
 using Microsoft.Playwright;
-using acceptance.Core.Spec;
+using acceptance.Core.Spec.Dsl;
 using acceptance.Core.Spec.Channels;
 
 namespace acceptance.Core.Harness;
