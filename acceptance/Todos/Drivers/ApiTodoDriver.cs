@@ -12,10 +12,10 @@ namespace acceptance.Todos.Drivers;
 
 public class ApiTodoDriver(HttpClient http) : ITodoDriver
 {
-    public async Task<DriverResult> AddTodo(string title) =>
+    public async Task<DriverResult> Add(string title) =>
         await ToResult(await http.PostAsJsonAsync("/api/todos", new { title }));
 
-    public async Task<DriverResult> CompleteTodo(string title)
+    public async Task<DriverResult> Complete(string title)
     {
         var todo = await Find(title);
         if (todo is null)
@@ -24,10 +24,10 @@ public class ApiTodoDriver(HttpClient http) : ITodoDriver
         return await ToResult(await http.PostAsync($"/api/todos/{todo.Id}/complete", null));
     }
 
-    public async Task ConfirmTodoIsShown(string title) =>
+    public async Task ConfirmShown(string title) =>
         Assert.True(await Find(title) is not null, $"Expected '{title}' in GET /api/todos");
 
-    public async Task ConfirmTodoIsComplete(string title) =>
+    public async Task ConfirmComplete(string title) =>
         Assert.True((await Find(title))?.Completed == true, $"Expected '{title}' to be completed");
 
     private static async Task<DriverResult> ToResult(HttpResponseMessage response) =>

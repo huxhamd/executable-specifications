@@ -6,5 +6,5 @@ namespace acceptance.Core.Spec.Channels;
 public partial interface IChannel
 {
     ITodoDriver Todos { get; }
-    ITodoTextInputDriver? TextInput => null;
+    ITodoEntryDriver? TodoEntry => null;
 }

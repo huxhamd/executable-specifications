@@ -163,11 +163,10 @@ acceptance/
         UiChannel.cs
   Todos/                        one folder per domain (spec agent)
     Drivers/                    the domain's contract
-      ITodoDriver.cs
-      ITodoTextInputDriver.cs
+      ITodoDriver.cs            what every channel can do with todos
+      ITodoEntryDriver.cs       live feedback while entering a todo (UI only)
       ApiTodoDriver.cs
-      UiTodoDriver.cs
-      UiTodoTextInputDriver.cs
+      UiTodoDriver.cs           implements both
     Channels/                   the domain's parts of the channel classes
       IChannel.Todos.cs
       ApiChannel.Todos.cs
@@ -179,7 +178,7 @@ acceptance/
 ```
 
 `Core/` holds everything that isn't about one domain, split by the role that owns it. Every other top-level folder is a domain (`Todos/`, later perhaps `Lists/`), and holds everything about that domain: its drivers, its parts of the channel classes, its vocabulary and its specs. Adding a domain is adding one folder.
-A **channel** is one way of reaching the whole system: the public API or the browser. It is made of small **drivers**, one per capability. A capability every channel must support, like `ITodoDriver`, is required. One only some channels support, like `ITodoTextInputDriver` (live feedback while typing, which only a browser has), is optional: channels that don't support it simply don't mention it.
+A **channel** is one way of reaching the whole system: the public API or the browser. Its driver interfaces are split by domain and by **capability**. A capability every channel must support, like `ITodoDriver`, is required. One only some channels support, like `ITodoEntryDriver` (live feedback while a new todo is being entered, which only a browser has), is optional: channels that don't support it simply don't mention it. Each channel has one driver class per domain, implementing every capability it supports, so `UiTodoDriver` implements both.
 
 ### Core/Harness/ChannelType.cs
 
@@ -482,34 +481,37 @@ public abstract partial class AcceptanceTestBase : IAsyncLifetime
 
 ### Todos/Drivers/ITodoDriver.cs
 
-The required todo capability: every channel implements it.
+The required todo capability: every channel implements it. The domain is in the type name, so method names don't repeat it.
 
 ```csharp
 using acceptance.Core.Spec;
 
 namespace acceptance.Todos.Drivers;
 
+// What every channel can do with todos. The domain is in the type name,
+// so methods don't repeat it: ITodoDriver.Add, not AddTodo.
 public interface ITodoDriver
 {
-    Task<DriverResult> AddTodo(string title);
-    Task<DriverResult> CompleteTodo(string title);
-    Task ConfirmTodoIsShown(string title);
-    Task ConfirmTodoIsComplete(string title);
+    Task<DriverResult> Add(string title);
+    Task<DriverResult> Complete(string title);
+    Task ConfirmShown(string title);
+    Task ConfirmComplete(string title);
 }
 ```
 
-### Todos/Drivers/ITodoTextInputDriver.cs
+### Todos/Drivers/ITodoEntryDriver.cs
 
-An optional capability. Only the UI channel supports it.
+An optional capability. Only the UI channel supports it. It's named for what the user is doing, not for the control they do it with.
 
 ```csharp
 namespace acceptance.Todos.Drivers;
 
-// Live feedback while a todo's title is being entered, before it is submitted.
-public interface ITodoTextInputDriver
+// Live feedback while a new todo is being entered, before it is submitted.
+// An optional capability: only channels with a live entry form offer it.
+public interface ITodoEntryDriver
 {
-    Task TypeTodoTitle(string title);
-    Task ConfirmTitleTooLongWarningIsShown();
+    Task TypeTitle(string title);
+    Task ConfirmTitleTooLongWarningShown();
 }
 ```
 
@@ -532,10 +534,10 @@ namespace acceptance.Todos.Drivers;
 
 public class ApiTodoDriver(HttpClient http) : ITodoDriver
 {
-    public async Task<DriverResult> AddTodo(string title) =>
+    public async Task<DriverResult> Add(string title) =>
         await ToResult(await http.PostAsJsonAsync("/api/todos", new { title }));
 
-    public async Task<DriverResult> CompleteTodo(string title)
+    public async Task<DriverResult> Complete(string title)
     {
         var todo = await Find(title);
         if (todo is null)
@@ -544,10 +546,10 @@ public class ApiTodoDriver(HttpClient http) : ITodoDriver
         return await ToResult(await http.PostAsync($"/api/todos/{todo.Id}/complete", null));
     }
 
-    public async Task ConfirmTodoIsShown(string title) =>
+    public async Task ConfirmShown(string title) =>
         Assert.True(await Find(title) is not null, $"Expected '{title}' in GET /api/todos");
 
-    public async Task ConfirmTodoIsComplete(string title) =>
+    public async Task ConfirmComplete(string title) =>
         Assert.True((await Find(title))?.Completed == true, $"Expected '{title}' to be completed");
 
     private static async Task<DriverResult> ToResult(HttpResponseMessage response) =>
@@ -578,7 +580,7 @@ public class ApiTodoDriver(HttpClient http) : ITodoDriver
 
 ### Todos/Drivers/UiTodoDriver.cs
 
-This comment is the UI contract: the `data-testid` attributes Angular must expose. Nothing here depends on CSS classes or layout, so the agent can restyle freely.
+This comment is the UI contract: the `data-testid` attributes Angular must expose. Nothing here depends on CSS classes or layout, so the agent can restyle freely. It's the UI channel's one todo driver, implementing both capabilities. `FillAsync` fires an `input` event, which is what the title input listens to, so there's no need to type character by character.
 
 ```csharp
 using System.Text.RegularExpressions;
@@ -589,16 +591,22 @@ using acceptance.Core.Spec;
 namespace acceptance.Todos.Drivers;
 
 // UI contract (data-testid attributes):
-//   new-todo-title     text input for a new todo's title
-//   add-todo           submit button; stays enabled, rejections show an error
-//   todo-item          one per todo, with data-completed="true" or "false"
-//   todo-title         the title text inside a todo-item
-//   complete-todo      control inside a todo-item that marks it complete
-//   error-message      visible when the last action was rejected
+//   new-todo-title           text input for a new todo's title
+//   add-todo                 submit button; stays enabled, rejections show an error
+//   title-too-long-warning   visible while the title being typed is too long,
+//                            before the todo is submitted
+//   todo-item                one per todo, with data-completed="true" or "false"
+//   todo-title               the title text inside a todo-item
+//   complete-todo            control inside a todo-item that marks it complete
+//   error-message            visible when the last action was rejected
 
-public class UiTodoDriver(IPage page) : ITodoDriver
+// One driver for every todo capability the browser offers. UiChannel hands
+// the same instance out once per capability.
+public class UiTodoDriver(IPage page) : ITodoDriver, ITodoEntryDriver
 {
-    public async Task<DriverResult> AddTodo(string title)
+    // ITodoDriver
+
+    public async Task<DriverResult> Add(string title)
     {
         await page.GotoAsync("/");
         await page.GetByTestId("new-todo-title").FillAsync(title);
@@ -606,24 +614,38 @@ public class UiTodoDriver(IPage page) : ITodoDriver
         return await Outcome(LocateTodo(title));
     }
 
-    public async Task<DriverResult> CompleteTodo(string title)
+    public async Task<DriverResult> Complete(string title)
     {
         await page.GotoAsync("/");
         await LocateTodo(title).GetByTestId("complete-todo").ClickAsync();
         return await Outcome(LocateCompletedTodo(title));
     }
 
-    public async Task ConfirmTodoIsShown(string title)
+    public async Task ConfirmShown(string title)
     {
         await page.GotoAsync("/");
         await Expect(LocateTodo(title)).ToBeVisibleAsync();
     }
 
-    public async Task ConfirmTodoIsComplete(string title)
+    public async Task ConfirmComplete(string title)
     {
         await page.GotoAsync("/");
         await Expect(LocateCompletedTodo(title)).ToBeVisibleAsync();
     }
+
+    // ITodoEntryDriver
+
+    // FillAsync fires an input event, which is what the title input listens to.
+    public async Task TypeTitle(string title)
+    {
+        await page.GotoAsync("/");
+        await page.GetByTestId("new-todo-title").FillAsync(title);
+    }
+
+    public Task ConfirmTitleTooLongWarningShown() =>
+        Expect(page.GetByTestId("title-too-long-warning")).ToBeVisibleAsync();
+
+    // Helpers
 
     // Exact match title, so "" only matches a todo whose title is really blank.
     private ILocator LocateTodo(string title) =>
@@ -632,7 +654,7 @@ public class UiTodoDriver(IPage page) : ITodoDriver
             Has = page
                     .GetByTestId("todo-title")
                     .Filter(new()
-                    { 
+                    {
                         HasTextRegex = new Regex($"^{Regex.Escape(title)}$")
                     })
         });
@@ -647,7 +669,7 @@ public class UiTodoDriver(IPage page) : ITodoDriver
         var result = await DriverResult.TryCatchAsync<TimeoutException>(
             () => success.Or(error).First.WaitForAsync()
         );
-        
+
         if (result.IsFailed)
             return DriverResult.Fail("Timed out waiting for either success or error");
 
@@ -655,35 +677,6 @@ public class UiTodoDriver(IPage page) : ITodoDriver
             ? DriverResult.Fail(await error.InnerTextAsync())
             : DriverResult.Okay;
     }
-}
-```
-
-### Todos/Drivers/UiTodoTextInputDriver.cs
-
-More UI contract. `FillAsync` fires an `input` event, which is what the title input listens to, so there's no need to type character by character.
-
-```csharp
-using Microsoft.Playwright;
-using static Microsoft.Playwright.Assertions;
-
-namespace acceptance.Todos.Drivers;
-
-// UI contract (data-testid attributes):
-//   new-todo-title           text input for a new todo's title (see UiTodoDriver)
-//   title-too-long-warning   visible while the title being typed is too long,
-//                            before the todo is submitted
-
-public class UiTodoTextInputDriver(IPage page) : ITodoTextInputDriver
-{
-    // FillAsync fires an input event, which is what the title input listens to.
-    public async Task TypeTodoTitle(string title)
-    {
-        await page.GotoAsync("/");
-        await page.GetByTestId("new-todo-title").FillAsync(title);
-    }
-
-    public Task ConfirmTitleTooLongWarningIsShown() =>
-        Expect(page.GetByTestId("title-too-long-warning")).ToBeVisibleAsync();
 }
 ```
 
@@ -700,14 +693,13 @@ namespace acceptance.Core.Spec.Channels;
 public partial interface IChannel
 {
     ITodoDriver Todos { get; }
-
-    ITodoTextInputDriver? TextInput => null;
+    ITodoEntryDriver? TodoEntry => null;
 }
 ```
 
 ### Todos/Channels/ApiChannel.Todos.cs
 
-How the API channel provides the todo domain. It doesn't mention `TextInput`, so the API channel doesn't support it.
+How the API channel provides the todo domain. It doesn't mention `TodoEntry`, so the API channel doesn't support it.
 
 ```csharp
 using acceptance.Todos.Drivers;
@@ -723,7 +715,7 @@ public partial class ApiChannel
 
 ### Todos/Channels/UiChannel.Todos.cs
 
-How the UI channel provides the todo domain, including the optional text input capability.
+How the UI channel provides the todo domain. It builds one `UiTodoDriver` and hands it out once per capability, including the optional entry capability.
 
 ```csharp
 using acceptance.Todos.Drivers;
@@ -731,10 +723,13 @@ using acceptance.Todos.Drivers;
 // Part of UiChannel (see Core/Spec/Channels/UiChannel.cs), so it shares that namespace.
 namespace acceptance.Core.Spec.Channels;
 
+// One todo driver for the browser, handed out once per capability it offers.
 public partial class UiChannel
 {
-    public ITodoDriver Todos { get; } = new UiTodoDriver(page);
-    public ITodoTextInputDriver? TextInput { get; } = new UiTodoTextInputDriver(page);
+    private readonly UiTodoDriver _todos = new(page);
+
+    public ITodoDriver Todos => _todos;
+    public ITodoEntryDriver? TodoEntry => _todos;
 }
 ```
 
@@ -753,10 +748,10 @@ namespace acceptance.Todos.Dsl;
 // Specs reach it as Todos, so methods don't repeat the word: Todos.Add("Buy milk").
 public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
 {
-    private ITodoDriver Driver => channel.Todos;
-
-    private ITodoTextInputDriver TextInput =>
-        Require(channel.TextInput, "live text input");
+    // Drivers are named for the domain capability they offer, never the mechanism.
+    private ITodoDriver Todos => channel.Todos;
+    private ITodoEntryDriver Entry =>
+        Require(channel.TodoEntry, "live feedback while entering a todo");
 
     public Task AttemptToAdd(string title) =>
         AttemptToAddAliased(Alias.For(title));
@@ -771,7 +766,7 @@ public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
     }
 
     public async Task AttemptToComplete(string title) =>
-        Record(await Driver.CompleteTodo(Alias.For(title)));
+        Record(await Todos.Complete(Alias.For(title)));
 
     public async Task Complete(string title)
     {
@@ -780,23 +775,23 @@ public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
     }
 
     public Task ConfirmShown(string title) =>
-        Driver.ConfirmTodoIsShown(Alias.For(title));
+        Todos.ConfirmShown(Alias.For(title));
 
     public Task ConfirmComplete(string title) =>
-        Driver.ConfirmTodoIsComplete(Alias.For(title));
+        Todos.ConfirmComplete(Alias.For(title));
 
-    // Live text input
+    // Live feedback while entering a todo
 
     public Task TypeTitleOfLength(int length) =>
-        TextInput.TypeTodoTitle(AliasedTitleOfLength(length));
+        Entry.TypeTitle(AliasedTitleOfLength(length));
 
     public Task ConfirmWarnedTitleIsTooLong() =>
-        TextInput.ConfirmTitleTooLongWarningIsShown();
+        Entry.ConfirmTitleTooLongWarningShown();
 
     // Helpers
 
     private async Task AttemptToAddAliased(string aliasedTitle) =>
-        Record(await Driver.AddTodo(aliasedTitle));
+        Record(await Todos.Add(aliasedTitle));
 
     // The alias suffix counts towards the length, so the system sees exactly `length` characters.
     private string AliasedTitleOfLength(int length)
