@@ -173,8 +173,8 @@ acceptance/
       UiChannel.Todos.cs
     Dsl/
       TodosDsl.cs               the todo vocabulary specs use
+    Specs/                      the spec layer; specs come later
       AcceptanceTestBase.Todos.cs   gives specs the Todos property
-    Specs/                      empty for now
 ```
 
 `Core/` holds everything that isn't about one domain, split by the role that owns it. Every other top-level folder is a domain (`Todos/`, later perhaps `Lists/`), and holds everything about that domain: its drivers, its parts of the channel classes, its vocabulary and its specs. Adding a domain is adding one folder.
@@ -431,8 +431,8 @@ using acceptance.Core.Spec.Channels;
 
 namespace acceptance.Core.Harness;
 
-// The base for every spec. Each business domain adds its DSL as one part
-// (<Domain>/Dsl/AcceptanceTestBase.<Domain>.cs), so specs read like
+// The base for every spec. Each business domain adds its DSL as one part,
+// next to its specs (<Domain>/Specs/AcceptanceTestBase.<Domain>.cs), so specs read like
 // Todos.Add("Buy milk"). Every part must be declared in this namespace,
 // whatever folder it lives in. A part in another namespace is silently a
 // different type.
@@ -802,9 +802,9 @@ public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
 }
 ```
 
-### Todos/Dsl/AcceptanceTestBase.Todos.cs
+### Todos/Specs/AcceptanceTestBase.Todos.cs
 
-The todo domain's part of `AcceptanceTestBase`: the `Todos` property specs use. A new domain adds one file like this, in its own folder, and nothing in `Core/` changes.
+The todo domain's part of `AcceptanceTestBase`: the `Todos` property specs use. It lives in `Specs/` because the base class is part of the spec layer: it consumes the DSL rather than forming part of it. A new domain adds one file like this, in its own folder, and nothing in `Core/` changes.
 
 ```csharp
 using acceptance.Todos.Dsl;
