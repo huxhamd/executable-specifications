@@ -3,8 +3,11 @@ using acceptance.Todos.Drivers;
 // Part of UiChannel (see Core/Spec/Channels/UiChannel.cs), so it shares that namespace.
 namespace acceptance.Core.Spec.Channels;
 
+// One todo driver for the browser, handed out once per capability it offers.
 public partial class UiChannel
 {
-    public ITodoDriver Todos { get; } = new UiTodoDriver(page);
-    public ITodoTextInputDriver? TextInput { get; } = new UiTodoTextInputDriver(page);
+    private readonly UiTodoDriver _todos = new(page);
+
+    public ITodoDriver Todos => _todos;
+    public ITodoEntryDriver? TodoEntry => _todos;
 }

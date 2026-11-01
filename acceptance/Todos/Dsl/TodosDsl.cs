@@ -8,9 +8,10 @@ namespace acceptance.Todos.Dsl;
 // Specs reach it as Todos, so methods don't repeat the word: Todos.Add("Buy milk").
 public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
 {
-    private ITodoDriver Driver => channel.Todos;
-    private ITodoTextInputDriver TextInput =>
-        Require(channel.TextInput, "live text input");
+    // Drivers are named for the domain capability they offer, never the mechanism.
+    private ITodoDriver Todos => channel.Todos;
+    private ITodoEntryDriver Entry =>
+        Require(channel.TodoEntry, "live feedback while entering a todo");
 
     public Task AttemptToAdd(string title) =>
         AttemptToAddAliased(Alias.For(title));
@@ -25,7 +26,7 @@ public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
     }
 
     public async Task AttemptToComplete(string title) =>
-        Record(await Driver.CompleteTodo(Alias.For(title)));
+        Record(await Todos.Complete(Alias.For(title)));
 
     public async Task Complete(string title)
     {
@@ -34,23 +35,23 @@ public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
     }
 
     public Task ConfirmShown(string title) =>
-        Driver.ConfirmTodoIsShown(Alias.For(title));
+        Todos.ConfirmShown(Alias.For(title));
 
     public Task ConfirmComplete(string title) =>
-        Driver.ConfirmTodoIsComplete(Alias.For(title));
+        Todos.ConfirmComplete(Alias.For(title));
 
-    // Live text input
+    // Live feedback while entering a todo
 
     public Task TypeTitleOfLength(int length) =>
-        TextInput.TypeTodoTitle(AliasedTitleOfLength(length));
+        Entry.TypeTitle(AliasedTitleOfLength(length));
 
     public Task ConfirmWarnedTitleIsTooLong() =>
-        TextInput.ConfirmTitleTooLongWarningIsShown();
+        Entry.ConfirmTitleTooLongWarningShown();
 
     // Helpers
 
     private async Task AttemptToAddAliased(string aliasedTitle) =>
-        Record(await Driver.AddTodo(aliasedTitle));
+        Record(await Todos.Add(aliasedTitle));
 
     // The alias suffix counts towards the length, so the system sees exactly `length` characters.
     private string AliasedTitleOfLength(int length)
