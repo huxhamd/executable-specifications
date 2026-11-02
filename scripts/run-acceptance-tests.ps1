@@ -61,7 +61,7 @@ $failed = @()
 foreach ($name in $channels) {
     Write-Host "`n=== Acceptance tests: $name ===`n"
     $env:ACCEPTANCE_CHANNEL = $name
-    dotnet test acceptance
+    dotnet test acceptance.Specs
     if ($LASTEXITCODE -ne 0) { $failed += $name }
 }
 Remove-Item Env:ACCEPTANCE_CHANNEL

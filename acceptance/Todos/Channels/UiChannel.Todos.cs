@@ -4,7 +4,7 @@ using acceptance.Todos.Drivers;
 namespace acceptance.Core.Channels;
 
 // One todo driver for the browser, handed out once per capability it offers.
-public partial class UiChannel
+internal partial class UiChannel
 {
     private readonly UiTodoDriver _todos = new(page);
 

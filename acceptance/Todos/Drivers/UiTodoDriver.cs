@@ -16,7 +16,7 @@ namespace acceptance.Todos.Drivers;
 
 // One driver for every todo capability the browser offers. UiChannel hands
 // the same instance out once per capability.
-public class UiTodoDriver(IPage page) : ITodoDriver, ITodoEntryDriver
+internal class UiTodoDriver(IPage page) : ITodoDriver, ITodoEntryDriver
 {
     // ITodoDriver
 

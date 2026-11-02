@@ -4,4 +4,4 @@ namespace acceptance.Core.Channels;
 // this channel's HttpClient. Its drivers are wired up one part per domain
 // (<Domain>/Channels/ApiChannel.<Domain>.cs); a capability not wired up
 // there is unsupported on this channel and falls back to IChannel's null default.
-public partial class ApiChannel(HttpClient http) : IChannel;
+internal partial class ApiChannel(HttpClient http) : IChannel;

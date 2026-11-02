@@ -1,6 +1,6 @@
 namespace acceptance.Core.Drivers;
 
-public record DriverResult(bool IsFailed, string Error = "")
+internal record DriverResult(bool IsFailed, string Error = "")
 {
     public static readonly DriverResult Okay = new(false);
     public static DriverResult Fail(string error) =>

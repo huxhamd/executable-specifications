@@ -7,4 +7,4 @@ namespace acceptance.Core.Channels;
 // session. Its drivers are wired up one part per domain
 // (<Domain>/Channels/UiChannel.<Domain>.cs); a capability not wired up there
 // is unsupported on this channel and falls back to IChannel's null default.
-public partial class UiChannel(IPage page) : IChannel;
+internal partial class UiChannel(IPage page) : IChannel;

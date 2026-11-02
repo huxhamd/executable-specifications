@@ -6,7 +6,7 @@ public enum ChannelType { Api, Ui }
 
 // The channel this run drives the system through, from ACCEPTANCE_CHANNEL:
 // a ChannelType name, in any case.
-public static class AcceptanceChannel
+internal static class AcceptanceChannel
 {
     public static ChannelType Current
     {

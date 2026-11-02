@@ -1,17 +1,23 @@
 using acceptance.Core.Dsl;
 using acceptance.Core.Channels;
 using acceptance.Todos.Drivers;
+using Xunit;
 
 namespace acceptance.Todos.Dsl;
 
 // The todo domain's vocabulary: everything a spec can say about todos.
 // Specs reach it as Todos, so methods don't repeat the word: Todos.Add("Buy milk").
-public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
+// Public so specs can use it; built only by AcceptanceTestBase, in this project.
+public class TodosDsl : DslBase
 {
+    private readonly IChannel _channel;
+
+    internal TodosDsl(IChannel channel, SpecContext context) : base(context) => _channel = channel;
+
     // Drivers are named for the domain capability they offer, never the mechanism.
-    private ITodoDriver Todos => channel.Todos;
+    private ITodoDriver Todos => _channel.Todos;
     private ITodoEntryDriver Entry =>
-        Require(channel.TodoEntry, "live feedback while entering a todo");
+        Require(_channel.TodoEntry, "live feedback while entering a todo");
 
     public async Task AttemptToAdd(string title) =>
         Record(await Todos.Add(Alias.For(title)));
