@@ -1,4 +1,4 @@
-using acceptance.Core.Harness;
+using acceptance.Core.Specs;
 
 namespace acceptance.Todos.Specs;
 

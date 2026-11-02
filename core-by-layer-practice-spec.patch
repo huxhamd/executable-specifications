@@ -1,0 +1,10 @@
+diff --git a/acceptance/Todos/Specs/AddingTodos.cs b/acceptance/Todos/Specs/AddingTodos.cs
+index 0a346fd..36b5115 100644
+--- a/acceptance/Todos/Specs/AddingTodos.cs
++++ b/acceptance/Todos/Specs/AddingTodos.cs
+@@ -1,4 +1,4 @@
+-using acceptance.Core.Harness;
++using acceptance.Core.Specs;
+ 
+ namespace acceptance.Todos.Specs;
+ 
