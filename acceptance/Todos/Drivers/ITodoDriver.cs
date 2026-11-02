@@ -8,6 +8,10 @@ public interface ITodoDriver
 {
     Task<DriverResult> Add(string title);
     Task<DriverResult> Complete(string title);
-    Task ConfirmShown(string title);
-    Task ConfirmComplete(string title);
+
+    // Observations: drivers report what they see, and the DSL decides whether
+    // that passes. Channels that update asynchronously wait for a yes before
+    // answering no.
+    Task<bool> IsShown(string title);
+    Task<bool> IsComplete(string title);
 }

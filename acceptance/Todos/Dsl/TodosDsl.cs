@@ -22,7 +22,7 @@ public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
     public async Task Add(string title)
     {
         await AttemptToAdd(title);
-        LastResult!.ShouldSucceed($"Could not add todo '{title}'");
+        ConfirmLastActionSucceeded($"Could not add todo '{title}'");
     }
 
     public async Task AttemptToComplete(string title) =>
@@ -31,22 +31,25 @@ public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
     public async Task Complete(string title)
     {
         await AttemptToComplete(title);
-        LastResult!.ShouldSucceed($"Could not complete todo '{title}'");
+        ConfirmLastActionSucceeded($"Could not complete todo '{title}'");
     }
 
-    public Task ConfirmShown(string title) =>
-        Todos.ConfirmShown(Alias.For(title));
+    public async Task ConfirmShown(string title) =>
+        Assert.True(await Todos.IsShown(Alias.For(title)),
+            $"Expected todo '{title}' to be shown");
 
-    public Task ConfirmComplete(string title) =>
-        Todos.ConfirmComplete(Alias.For(title));
+    public async Task ConfirmComplete(string title) =>
+        Assert.True(await Todos.IsComplete(Alias.For(title)),
+            $"Expected todo '{title}' to be complete");
 
     // Live feedback while entering a todo
 
     public Task TypeTitleOfLength(int length) =>
         Entry.TypeTitle(AliasedTitleOfLength(length));
 
-    public Task ConfirmWarnedTitleIsTooLong() =>
-        Entry.ConfirmTitleTooLongWarningShown();
+    public async Task ConfirmWarnedTitleIsTooLong() =>
+        Assert.True(await Entry.IsTitleTooLongWarningShown(),
+            "Expected a warning that the title is too long");
 
     // Helpers
 

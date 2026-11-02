@@ -9,9 +9,14 @@ public abstract class DslBase(SpecContext context)
 {
     protected Alias Alias => context.Alias;
 
-    protected DriverResult? LastResult => context.LastResult;
-
     protected void Record(DriverResult result) => context.LastResult = result;
+
+    // Drivers report what happened; the DSL decides whether that passes.
+    protected void ConfirmLastActionSucceeded(string because)
+    {
+        Assert.NotNull(context.LastResult);
+        Assert.False(context.LastResult.IsFailed, $"{because}. The system said: {context.LastResult.Error}");
+    }
 
     protected static T Require<T>(T? capability, string description) where T : class =>
         capability ?? throw new InvalidOperationException(

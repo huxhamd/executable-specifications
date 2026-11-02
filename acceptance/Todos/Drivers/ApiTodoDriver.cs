@@ -24,11 +24,11 @@ public class ApiTodoDriver(HttpClient http) : ITodoDriver
         return await ToResult(await http.PostAsync($"/api/todos/{todo.Id}/complete", null));
     }
 
-    public async Task ConfirmShown(string title) =>
-        Assert.True(await Find(title) is not null, $"Expected '{title}' in GET /api/todos");
+    public async Task<bool> IsShown(string title) =>
+        await Find(title) is not null;
 
-    public async Task ConfirmComplete(string title) =>
-        Assert.True((await Find(title))?.Completed == true, $"Expected '{title}' to be completed");
+    public async Task<bool> IsComplete(string title) =>
+        (await Find(title))?.Completed == true;
 
     private static async Task<DriverResult> ToResult(HttpResponseMessage response) =>
         response.IsSuccessStatusCode

@@ -5,5 +5,5 @@ namespace acceptance.Todos.Drivers;
 public interface ITodoEntryDriver
 {
     Task TypeTitle(string title);
-    Task ConfirmTitleTooLongWarningShown();
+    Task<bool> IsTitleTooLongWarningShown();
 }

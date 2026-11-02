@@ -1,6 +1,5 @@
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
-using static Microsoft.Playwright.Assertions;
 using acceptance.Core.Spec.Drivers;
 
 namespace acceptance.Todos.Drivers;
@@ -36,16 +35,16 @@ public class UiTodoDriver(IPage page) : ITodoDriver, ITodoEntryDriver
         return await Outcome(LocateCompletedTodo(title));
     }
 
-    public async Task ConfirmShown(string title)
+    public async Task<bool> IsShown(string title)
     {
         await page.GotoAsync("/");
-        await Expect(LocateTodo(title)).ToBeVisibleAsync();
+        return await Eventually(LocateTodo(title));
     }
 
-    public async Task ConfirmComplete(string title)
+    public async Task<bool> IsComplete(string title)
     {
         await page.GotoAsync("/");
-        await Expect(LocateCompletedTodo(title)).ToBeVisibleAsync();
+        return await Eventually(LocateCompletedTodo(title));
     }
 
     // ITodoEntryDriver
@@ -57,10 +56,20 @@ public class UiTodoDriver(IPage page) : ITodoDriver, ITodoEntryDriver
         await page.GetByTestId("new-todo-title").FillAsync(title);
     }
 
-    public Task ConfirmTitleTooLongWarningShown() =>
-        Expect(page.GetByTestId("title-too-long-warning")).ToBeVisibleAsync();
+    public Task<bool> IsTitleTooLongWarningShown() =>
+        Eventually(page.GetByTestId("title-too-long-warning"));
 
     // Helpers
+
+    // Whether the locator becomes visible within the page's default timeout.
+    // Waits for a yes, so a no takes the full timeout: to check that something
+    // is absent, wait for it to be hidden instead of negating this.
+    private static async Task<bool> Eventually(ILocator locator)
+    {
+        var result = await DriverResult.TryCatchAsync<TimeoutException>(
+            () => locator.WaitForAsync());
+        return !result.IsFailed;
+    }
 
     // Exact match title, so "" only matches a todo whose title is really blank.
     private ILocator LocateTodo(string title) =>
