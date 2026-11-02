@@ -1,6 +1,6 @@
 namespace acceptance.Core.Dsl;
 
-public class Alias
+internal class Alias
 {
     private const int SuffixLength = 7;   // "_" plus 6 characters
     private readonly string _suffix = Guid.NewGuid().ToString("N")[..(SuffixLength - 1)];

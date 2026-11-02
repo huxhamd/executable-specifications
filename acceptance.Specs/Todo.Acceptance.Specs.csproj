@@ -1,5 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
+  <!--
+    The executable specifications, one folder per domain. They see only
+    what ../acceptance makes public: AcceptanceTestBase, the DSLs, ChannelType
+    and the Channels attribute. Drivers and channels are internal to it.
+  -->
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
@@ -11,12 +17,16 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-    <PackageReference Include="Microsoft.Playwright" Version="1.64.1" />
     <PackageReference Include="xunit.v3" Version="3.2.0" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../acceptance/Todo.Acceptance.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Every spec needs [Fact], so xUnit is a global using here. -->
     <Using Include="Xunit" />
   </ItemGroup>
 

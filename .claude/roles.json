@@ -6,7 +6,8 @@
       "summary": "Helps the human write executable specifications. Never implements.",
       "worksOnTemplate": false,
       "owns": [
-        "acceptance/"
+        "acceptance/",
+        "acceptance.Specs/"
       ]
     },
     "app-agent": {
@@ -23,7 +24,8 @@
       "worksOnTemplate": true,
       "owns": [
         "acceptance/Core/Specs/",
-        "acceptance/Todo.AcceptanceTests.csproj",
+        "acceptance/Todo.Acceptance.csproj",
+        "acceptance.Specs/Todo.Acceptance.Specs.csproj",
         ".claude/",
         "scripts/",
         "CLAUDE.md",

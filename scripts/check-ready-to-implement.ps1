@@ -19,9 +19,9 @@ if ($dirty) {
     exit 1
 }
 
-$found = git grep -n -E "Task\s+$Spec\s*\(" HEAD -- ":(glob)acceptance/*/Specs/**"
+$found = git grep -n -E "Task\s+$Spec\s*\(" HEAD -- ":(glob)acceptance.Specs/**"
 if (-not $found) {
-    [Console]::Error.WriteLine("No committed spec named '$Spec' in acceptance/<Domain>/Specs.")
+    [Console]::Error.WriteLine("No committed spec named '$Spec' in acceptance.Specs/<Domain>.")
     exit 1
 }
 

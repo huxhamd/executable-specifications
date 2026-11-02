@@ -10,7 +10,7 @@ namespace acceptance.Todos.Drivers;
 //                                         e.g. errors.title = ["A title is required"]
 //   POST   /api/todos/{id}/complete    -> 2xx
 
-public class ApiTodoDriver(HttpClient http) : ITodoDriver
+internal class ApiTodoDriver(HttpClient http) : ITodoDriver
 {
     public async Task<DriverResult> Add(string title) =>
         await ToResult(await http.PostAsJsonAsync("/api/todos", new { title }));

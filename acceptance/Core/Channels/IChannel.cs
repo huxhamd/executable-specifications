@@ -7,4 +7,4 @@ namespace acceptance.Core.Channels;
 // Every part of IChannel, ApiChannel and UiChannel must be declared in this
 // namespace, whatever folder it lives in. A part in another namespace is
 // silently a different type.
-public partial interface IChannel;
+internal partial interface IChannel;

@@ -1,4 +1,5 @@
 using System.Reflection;
+using Xunit;
 using Xunit.v3;
 
 namespace acceptance.Core.Specs;
