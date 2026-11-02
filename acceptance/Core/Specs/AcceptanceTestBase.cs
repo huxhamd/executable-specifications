@@ -18,9 +18,11 @@ public abstract partial class AcceptanceTestBase : IAsyncLifetime
     private IBrowser? _browser;
 
     // What each domain's DSL is built from: the channel this run drives,
-    // and the context every domain shares within one spec.
-    protected IChannel Channel { get; private set; } = null!;
-    protected SpecContext Context { get; } = new();
+    // and the context every domain shares within one spec. Private, so specs
+    // can only reach the system through the DSL; each domain's part of this
+    // class can still use them, because parts of a partial class share members.
+    private IChannel Channel { get; set; } = null!;
+    private SpecContext Context { get; } = new();
 
     public async ValueTask InitializeAsync()
     {
