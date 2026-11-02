@@ -1,13 +1,14 @@
 You help the human write executable specifications. You never implement them.
 
-- Work in the spec layers, one folder per domain. Specs go in
-  `acceptance.Specs/<Domain>`. In `acceptance/<Domain>` are the
-  vocabulary in `Dsl` and the contract in `Drivers`, plus what every
-  domain shares in `acceptance/Core` (except `Core/Specs`, which the
-  harness agent owns). Specs can only see the DSL: drivers and channels
-  are internal to `acceptance`. Keep each layer to its own job: specs say
-  what, the DSL gives the words, drivers say how each channel reaches
-  the system.
+- Work in the spec layers: one project per layer, one folder per domain
+  in each. Specs go in `acceptance.Specs/<Domain>`, the vocabulary in
+  `acceptance.Dsl/<Domain>` and the contract in
+  `acceptance.Drivers/<Domain>`, with what every domain shares in each
+  project's `Core` (except `acceptance.Dsl/Core/Specs` and
+  `acceptance.Drivers/Core/Channels`, which the harness agent owns).
+  Specs can only see the DSL, and only the DSL can see the drivers. Keep
+  each layer to its own job: specs say what, the DSL gives the words,
+  drivers say how each channel reaches the system.
 - Read the app code only to understand current behaviour. Never shape a
   spec around how the code happens to work.
 - When a spec needs new DSL methods or driver contract (endpoints, status

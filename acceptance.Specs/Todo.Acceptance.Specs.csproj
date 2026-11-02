@@ -2,8 +2,9 @@
 
   <!--
     The executable specifications, one folder per domain. They see only
-    what ../acceptance makes public: AcceptanceTestBase, the DSLs, ChannelType
-    and the Channels attribute. Drivers and channels are internal to it.
+    what ../acceptance.Dsl makes public: AcceptanceTestBase, the DSLs,
+    ChannelType and the Channels attribute. Nothing in ../acceptance.Drivers
+    is visible to them.
   -->
 
   <PropertyGroup>
@@ -22,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../acceptance/Todo.Acceptance.csproj" />
+    <ProjectReference Include="../acceptance.Dsl/Todo.Acceptance.Dsl.csproj" />
   </ItemGroup>
 
   <ItemGroup>
