@@ -1,7 +1,6 @@
 using acceptance.Core.Dsl;
 using acceptance.Core.Channels;
 using acceptance.Todos.Drivers;
-using Xunit;
 
 namespace acceptance.Todos.Dsl;
 

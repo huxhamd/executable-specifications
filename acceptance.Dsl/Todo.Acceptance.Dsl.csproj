@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The DSL layer: the vocabulary specs speak, and the spec base that hands
+    it to them. Specs live in ../acceptance.Specs and see only what's public
+    here. The drivers it speaks through are internal to ../acceptance.Drivers,
+    which lets only this project see them.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- xUnit's library for extensions, not its test runner: this project holds no tests. -->
+    <PackageReference Include="xunit.v3.extensibility.core" Version="3.2.0" />
+    <PackageReference Include="xunit.v3.assert" Version="3.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../acceptance.Drivers/Todo.Acceptance.Drivers.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The DSL gives the verdicts, so xUnit is a global using here. -->
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>

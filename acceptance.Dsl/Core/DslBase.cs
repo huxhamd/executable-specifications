@@ -1,5 +1,4 @@
 using acceptance.Core.Drivers;
-using Xunit;
 
 namespace acceptance.Core.Dsl;
 
@@ -8,8 +7,8 @@ namespace acceptance.Core.Dsl;
 // check the outcome from any of them.
 //
 // Specs live in another project and see only the public members: the DSL's
-// vocabulary. Everything a DSL is built from is internal to this project, so
-// the constructor and the helpers below are private protected.
+// vocabulary. What a DSL is built from (drivers, channels, the spec context)
+// is internal, so the constructor and the helpers below are private protected.
 public abstract class DslBase
 {
     private readonly SpecContext _context;

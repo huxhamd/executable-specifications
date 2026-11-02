@@ -4,7 +4,7 @@
 # Not mandatory: PowerShell would prompt for it, which an agent can't answer.
 param([string]$Channel)
 
-# The channels, by name. acceptance/Core/Specs/ChannelType.cs keeps its own list
+# The channels, by name. acceptance.Dsl/Core/Specs/ChannelType.cs keeps its own list
 # (the ChannelType enum): add or rename a channel in both places.
 $allChannels = "api", "ui"
 

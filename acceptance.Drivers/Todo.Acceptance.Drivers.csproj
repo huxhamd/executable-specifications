@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The driver layer: how each channel reaches the system. Drivers and
+    channels are internal, and only the DSL may see them. Specs can't.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Playwright" Version="1.64.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Todo.Acceptance.Dsl" />
+  </ItemGroup>
+
+  <!--
+    No xUnit here, on purpose: drivers report what they see, and the DSL
+    decides whether that passes, so Assert doesn't exist in this project.
+    Playwright's own assertions do, because they ship in the package the
+    drivers need: `using static Microsoft.Playwright.Assertions;` in a driver
+    means a verdict has crept into the wrong layer.
+  -->
+
+</Project>

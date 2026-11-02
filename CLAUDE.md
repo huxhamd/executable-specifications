@@ -16,7 +16,7 @@
 
 ## Always
 - Never commit or push. The human commits after review.
-- The drivers in `acceptance/<Domain>/Drivers` define the contract: API routes,
+- The drivers in `acceptance.Drivers/<Domain>` define the contract: API routes,
   JSON shape and the UI's `data-testid` attributes.
 - Specs describe behaviour in domain language. Every spec must pass on
   every channel unless it is marked `[Fact, Channels(...)]`.
