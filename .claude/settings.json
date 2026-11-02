@@ -6,7 +6,7 @@
         "Edit(/.claude/hooks/roles.ps1)",
         "Edit(/.claude/hooks/role-hooks.ps1)",
         "Edit(/scripts/set-role.ps1)",
-        "Edit(/scripts/check-protected-files.ps1)"
+        "Edit(/.claude/hooks/check-protected-files.ps1)"
     ]
   },
   "hooks": {

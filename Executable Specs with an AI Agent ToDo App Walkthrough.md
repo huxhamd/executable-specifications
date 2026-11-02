@@ -188,29 +188,36 @@ The `ACCEPTANCE_CHANNEL` environment variable chooses the channel, so every spec
 ```csharp
 namespace acceptance.Core.Specs;
 
+// The channels a spec can run through. scripts/run-acceptance-tests.ps1 keeps
+// its own list of channel names: add or rename a channel in both places.
 public enum ChannelType { Api, Ui }
 
-// The channel this run drives the system through, from ACCEPTANCE_CHANNEL.
+// The channel this run drives the system through, from ACCEPTANCE_CHANNEL:
+// a ChannelType name, in any case.
 public static class AcceptanceChannel
 {
     public static ChannelType Current
     {
         get
         {
-            var value = Environment
-                .GetEnvironmentVariable("ACCEPTANCE_CHANNEL")
-                ?.Trim().ToLowerInvariant();
-            return value switch
-            {
-                "api" => ChannelType.Api,
-                "ui" => ChannelType.Ui,
-                null or "" => throw new InvalidOperationException(
-                    "Set ACCEPTANCE_CHANNEL to 'api' or 'ui' before running the acceptance tests."),
-                _ => throw new InvalidOperationException(
-                    $"Unknown ACCEPTANCE_CHANNEL '{value}'. Use 'api' or 'ui'.")
-            };
+            var value = Environment.GetEnvironmentVariable("ACCEPTANCE_CHANNEL")?.Trim();
+            if (string.IsNullOrEmpty(value))
+                throw new InvalidOperationException(
+                    $"Set ACCEPTANCE_CHANNEL to {Choices} before running the acceptance tests.");
+
+            // Matched by name rather than Enum.TryParse, which would also accept
+            // numbers ("0") and lists of flags ("Api, Ui").
+            var name = Enum.GetNames<ChannelType>()
+                .SingleOrDefault(candidate => candidate.Equals(value, StringComparison.OrdinalIgnoreCase));
+            return name is not null
+                ? Enum.Parse<ChannelType>(name)
+                : throw new InvalidOperationException(
+                    $"Unknown ACCEPTANCE_CHANNEL '{value}'. Use {Choices}.");
         }
     }
+
+    private static string Choices =>
+        string.Join(" or ", Enum.GetNames<ChannelType>().Select(name => $"'{name.ToLowerInvariant()}'"));
 }
 ```
 
@@ -993,7 +1000,7 @@ Wires the hooks up. `$CLAUDE_PROJECT_DIR` keeps them working if the agent change
         "Edit(/.claude/hooks/roles.ps1)",
         "Edit(/.claude/hooks/role-hooks.ps1)",
         "Edit(/scripts/set-role.ps1)",
-        "Edit(/scripts/check-protected-files.ps1)"
+        "Edit(/.claude/hooks/check-protected-files.ps1)"
     ]
   },
   "hooks": {
@@ -1164,7 +1171,7 @@ human.
 
 When you stop, leave your changes uncommitted for the human to review.
 Before reporting, check that the API and web projects still build and
-that `pwsh -File scripts/check-protected-files.ps1` passes. If your latest
+that `pwsh -File .claude/hooks/check-protected-files.ps1` passes. If your latest
 change broke the build, undo that change only.
 
 ## Steps
@@ -1191,19 +1198,21 @@ The scripts are PowerShell, so they run the same on Windows, macOS and Linux wit
 | Script | What it does |
 | --- | --- |
 | `scripts/set-role.ps1` | Sets the role for this worktree's next session, or shows the roles; the terminal version of the role commands |
-| `scripts/run-acceptance-tests.ps1` | Starts Docker if needed, deploys fresh containers, runs every spec on each channel |
+| `scripts/run-acceptance-tests.ps1` | Starts Docker if needed, deploys fresh containers, runs every spec on each channel, or on one with `-Channel ui` |
 | `scripts/check-ready-to-implement.ps1` | Checks the tree is clean and the named spec is committed |
 | `scripts/check-done.ps1` | The definition of done: the protected-files check, all unit tests and all acceptance tests |
-| `scripts/check-protected-files.ps1` | Fails if an uncommitted change is outside the role of the last session started here |
 
-The machinery only Claude Code runs lives beside the settings that wire it up:
+The ones you run most also have commands in the Claude Code chat, so they tab-complete: `/run-specs [channel]`, `/check-done` and `/check-ready <SpecName>`. Claude runs the script and summarises the result. The commands are small files in `.claude/commands/`; the scripts still work on their own in a terminal.
+
+The role machinery lives beside the settings that wire it up. You don't run it directly:
 
 | Script | What it does |
 | --- | --- |
 | `.claude/hooks/role-hooks.ps1` | The four hooks that enforce the session's role |
 | `.claude/hooks/roles.ps1` | Shared by the hooks and the role scripts: reads `roles.json`, works out who owns a path, tracks what changed |
+| `.claude/hooks/check-protected-files.ps1` | Fails if an uncommitted change is outside the role of the last session started here; `check-done.ps1` runs it |
 
-`run-acceptance-tests.ps1` uses `--force-recreate`, so every run gets fresh containers and data doesn't build up across runs. Within a run both channels share one system, which is fine because aliasing keeps specs apart. If Docker isn't running, it starts Docker Desktop and waits; to avoid the wait, turn on *Start Docker Desktop when you sign in* in Docker Desktop's general settings.
+The channel names are listed twice, in the `ChannelType` enum and in `run-acceptance-tests.ps1`, and each points to the other: add or rename a channel in both. `run-acceptance-tests.ps1` uses `--force-recreate`, so every run gets fresh containers and data doesn't build up across runs. Within a run both channels share one system, which is fine because aliasing keeps specs apart. If Docker isn't running, it starts Docker Desktop and waits; to avoid the wait, turn on *Start Docker Desktop when you sign in* in Docker Desktop's general settings.
 
 To run one channel by itself, for example while writing a spec, start the stack and set the channel for that run:
 

@@ -19,7 +19,7 @@ human.
 
 When you stop, leave your changes uncommitted for the human to review.
 Before reporting, check that the API and web projects still build and
-that `pwsh -File scripts/check-protected-files.ps1` passes. If your latest
+that `pwsh -File .claude/hooks/check-protected-files.ps1` passes. If your latest
 change broke the build, undo that change only.
 
 ## Steps

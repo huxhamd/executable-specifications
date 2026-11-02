@@ -1,4 +1,23 @@
-# Deploys the system in fresh containers and runs every spec through each channel.
+# Deploys the system in fresh containers and runs every spec through each channel,
+# or through one: -Channel ui.
+
+# Not mandatory: PowerShell would prompt for it, which an agent can't answer.
+param([string]$Channel)
+
+# The channels, by name. acceptance/Core/Specs/ChannelType.cs keeps its own list
+# (the ChannelType enum): add or rename a channel in both places.
+$allChannels = "api", "ui"
+
+# Checked before deploying, so a mistyped channel fails at once.
+$channels = $allChannels
+if ($Channel -and $Channel.Trim()) {
+    $channels = @($Channel.Trim().ToLowerInvariant())
+    if ($channels[0] -notin $allChannels) {
+        [Console]::Error.WriteLine(
+            "Unknown channel '$Channel'. Use one of: $($allChannels -join ', '), or none for every channel.")
+        exit 1
+    }
+}
 
 # Docker must be running first. If it isn't, try to start Docker Desktop and wait for it.
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
@@ -37,12 +56,13 @@ if (-not (Test-DockerRunning)) {
 docker compose up -d --build --force-recreate
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+# $name, not $channel: PowerShell variable names ignore case, so $channel is $Channel.
 $failed = @()
-foreach ($channel in "api", "ui") {
-    Write-Host "`n=== Acceptance tests: $channel ===`n"
-    $env:ACCEPTANCE_CHANNEL = $channel
+foreach ($name in $channels) {
+    Write-Host "`n=== Acceptance tests: $name ===`n"
+    $env:ACCEPTANCE_CHANNEL = $name
     dotnet test acceptance
-    if ($LASTEXITCODE -ne 0) { $failed += $channel }
+    if ($LASTEXITCODE -ne 0) { $failed += $name }
 }
 Remove-Item Env:ACCEPTANCE_CHANNEL
 
@@ -50,4 +70,5 @@ if ($failed) {
     Write-Host "`nFailed channels: $($failed -join ', ')" -ForegroundColor Red
     exit 1
 }
-Write-Host "`nAll channels passed" -ForegroundColor Green
+$passed = if ($channels.Count -eq $allChannels.Count) { "All channels passed" } else { "Channel $($channels -join ', ') passed" }
+Write-Host "`n$passed" -ForegroundColor Green

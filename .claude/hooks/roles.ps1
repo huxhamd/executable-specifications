@@ -1,4 +1,4 @@
-# Shared by the role hooks, scripts/set-role.ps1 and scripts/check-protected-files.ps1.
+# Shared by the role hooks, check-protected-files.ps1 and scripts/set-role.ps1.
 # Dot-source it: . "$PSScriptRoot/roles.ps1" from this folder, or
 # . "$PSScriptRoot/../.claude/hooks/roles.ps1" from scripts/.
 #
