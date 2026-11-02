@@ -1,5 +1,5 @@
-using acceptance.Core.Spec.Dsl;
-using acceptance.Core.Spec.Channels;
+using acceptance.Core.Dsl;
+using acceptance.Core.Channels;
 using acceptance.Todos.Drivers;
 
 namespace acceptance.Todos.Dsl;

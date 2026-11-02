@@ -1,6 +1,6 @@
 using Microsoft.Playwright;
 
-namespace acceptance.Core.Spec.Channels;
+namespace acceptance.Core.Channels;
 
 // Drives the system through the web app in a browser, as a user would.
 // Every UI driver shares this channel's page, so they all act in one browser

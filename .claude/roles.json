@@ -22,7 +22,7 @@
       "summary": "Improves the harness and the template. Writes no specs or app code.",
       "worksOnTemplate": true,
       "owns": [
-        "acceptance/Core/Harness/",
+        "acceptance/Core/Specs/",
         "acceptance/Todo.AcceptanceTests.csproj",
         ".claude/",
         "scripts/",

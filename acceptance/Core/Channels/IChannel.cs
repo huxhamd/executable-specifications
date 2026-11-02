@@ -1,4 +1,4 @@
-namespace acceptance.Core.Spec.Channels;
+namespace acceptance.Core.Channels;
 
 // The capabilities one channel offers, split into one part per domain
 // (<Domain>/Channels/IChannel.<Domain>.cs). Required capabilities have no

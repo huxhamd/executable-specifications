@@ -1,6 +1,6 @@
-using acceptance.Core.Spec.Drivers;
+using acceptance.Core.Drivers;
 
-namespace acceptance.Core.Spec.Dsl;
+namespace acceptance.Core.Dsl;
 
 // The base for each business domain's DSL: Todos now, Lists or Accounts later.
 // Every domain shares the spec's context, so a spec can act in one domain and

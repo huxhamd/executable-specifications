@@ -1,5 +1,5 @@
 using System.Net.Http.Json;
-using acceptance.Core.Spec.Drivers;
+using acceptance.Core.Drivers;
 
 namespace acceptance.Todos.Drivers;
 
