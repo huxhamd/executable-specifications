@@ -241,18 +241,26 @@ public sealed class ChannelsAttribute(params ChannelType[] channels) : BeforeAft
 
 ### Core/Dsl/Alias.cs
 
-Every test gets its own suffix, so "Buy milk" becomes "Buy milk_3f9a1c". Tests never see each other's data, so there's no database reset and they can run in parallel, even against a system already full of data. Blank names stay blank, so you can still test empty input. `SuffixLength` lets the DSL build titles of an exact length, alias included.
+Every test gets its own suffix, so "Buy milk" becomes "Buy milk_3f9a1c". Tests never see each other's data, so there's no database reset and they can run in parallel, even against a system already full of data. Blank names stay blank, so you can still test empty input. `OfLength` gives a unique value of an exact length, suffix included, so the DSL can test length limits without knowing how the suffix is built.
 
 ```csharp
 namespace acceptance.Core.Dsl;
 
 public class Alias
 {
-    public static readonly int SuffixLength = 7;
-    private readonly string _suffix = Guid.NewGuid().ToString("N")[..(SuffixLength-1)];
+    private const int SuffixLength = 7;   // "_" plus 6 characters
+    private readonly string _suffix = Guid.NewGuid().ToString("N")[..(SuffixLength - 1)];
 
     public string For(string name) =>
         string.IsNullOrWhiteSpace(name) ? name : $"{name}_{_suffix}";
+
+    // A value unique to this spec that the system sees as exactly `length`
+    // characters, suffix included.
+    public string OfLength(int length)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(length, SuffixLength);
+        return For(new string('a', length - SuffixLength));
+    }
 }
 ```
 
@@ -772,11 +780,11 @@ public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
     private ITodoEntryDriver Entry =>
         Require(channel.TodoEntry, "live feedback while entering a todo");
 
-    public Task AttemptToAdd(string title) =>
-        AttemptToAddAliased(Alias.For(title));
+    public async Task AttemptToAdd(string title) =>
+        Record(await Todos.Add(Alias.For(title)));
 
-    public Task AttemptToAddWithTitleOfLength(int length) =>
-        AttemptToAddAliased(AliasedTitleOfLength(length));
+    public async Task AttemptToAddWithTitleOfLength(int length) =>
+        Record(await Todos.Add(Alias.OfLength(length)));
 
     public async Task Add(string title)
     {
@@ -804,23 +812,11 @@ public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
     // Live feedback while entering a todo
 
     public Task TypeTitleOfLength(int length) =>
-        Entry.TypeTitle(AliasedTitleOfLength(length));
+        Entry.TypeTitle(Alias.OfLength(length));
 
     public async Task ConfirmWarnedTitleIsTooLong() =>
         Assert.True(await Entry.IsTitleTooLongWarningShown(),
             "Expected a warning that the title is too long");
-
-    // Helpers
-
-    private async Task AttemptToAddAliased(string aliasedTitle) =>
-        Record(await Todos.Add(aliasedTitle));
-
-    // The alias suffix counts towards the length, so the system sees exactly `length` characters.
-    private string AliasedTitleOfLength(int length)
-    {
-        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(length, Alias.SuffixLength);
-        return Alias.For(new string('a', length - Alias.SuffixLength));
-    }
 }
 ```
 
