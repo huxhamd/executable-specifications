@@ -270,10 +270,6 @@ public record DriverResult(bool IsFailed, string Error = "")
     public static DriverResult Fail(string error) =>
         new(true, error);
 
-    public void ShouldSucceed(string because) =>
-        Assert.False(IsFailed, $"{because}. The system said: {Error}");
-
-
     // Operations with no result
 
     public static Task<DriverResult> TryCatchAsync(
@@ -407,9 +403,14 @@ public abstract class DslBase(SpecContext context)
 {
     protected Alias Alias => context.Alias;
 
-    protected DriverResult? LastResult => context.LastResult;
-
     protected void Record(DriverResult result) => context.LastResult = result;
+
+    // Drivers report what happened; the DSL decides whether that passes.
+    protected void ConfirmLastActionSucceeded(string because)
+    {
+        Assert.NotNull(context.LastResult);
+        Assert.False(context.LastResult.IsFailed, $"{because}. The system said: {context.LastResult.Error}");
+    }
 
     protected static T Require<T>(T? capability, string description) where T : class =>
         capability ?? throw new InvalidOperationException(
@@ -500,8 +501,12 @@ public interface ITodoDriver
 {
     Task<DriverResult> Add(string title);
     Task<DriverResult> Complete(string title);
-    Task ConfirmShown(string title);
-    Task ConfirmComplete(string title);
+
+    // Observations: drivers report what they see, and the DSL decides whether
+    // that passes. Channels that update asynchronously wait for a yes before
+    // answering no.
+    Task<bool> IsShown(string title);
+    Task<bool> IsComplete(string title);
 }
 ```
 
@@ -517,7 +522,7 @@ namespace acceptance.Todos.Drivers;
 public interface ITodoEntryDriver
 {
     Task TypeTitle(string title);
-    Task ConfirmTitleTooLongWarningShown();
+    Task<bool> IsTitleTooLongWarningShown();
 }
 ```
 
@@ -552,11 +557,11 @@ public class ApiTodoDriver(HttpClient http) : ITodoDriver
         return await ToResult(await http.PostAsync($"/api/todos/{todo.Id}/complete", null));
     }
 
-    public async Task ConfirmShown(string title) =>
-        Assert.True(await Find(title) is not null, $"Expected '{title}' in GET /api/todos");
+    public async Task<bool> IsShown(string title) =>
+        await Find(title) is not null;
 
-    public async Task ConfirmComplete(string title) =>
-        Assert.True((await Find(title))?.Completed == true, $"Expected '{title}' to be completed");
+    public async Task<bool> IsComplete(string title) =>
+        (await Find(title))?.Completed == true;
 
     private static async Task<DriverResult> ToResult(HttpResponseMessage response) =>
         response.IsSuccessStatusCode
@@ -591,7 +596,6 @@ This comment is the UI contract: the `data-testid` attributes Angular must expos
 ```csharp
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
-using static Microsoft.Playwright.Assertions;
 using acceptance.Core.Spec.Drivers;
 
 namespace acceptance.Todos.Drivers;
@@ -627,16 +631,16 @@ public class UiTodoDriver(IPage page) : ITodoDriver, ITodoEntryDriver
         return await Outcome(LocateCompletedTodo(title));
     }
 
-    public async Task ConfirmShown(string title)
+    public async Task<bool> IsShown(string title)
     {
         await page.GotoAsync("/");
-        await Expect(LocateTodo(title)).ToBeVisibleAsync();
+        return await Eventually(LocateTodo(title));
     }
 
-    public async Task ConfirmComplete(string title)
+    public async Task<bool> IsComplete(string title)
     {
         await page.GotoAsync("/");
-        await Expect(LocateCompletedTodo(title)).ToBeVisibleAsync();
+        return await Eventually(LocateCompletedTodo(title));
     }
 
     // ITodoEntryDriver
@@ -648,10 +652,20 @@ public class UiTodoDriver(IPage page) : ITodoDriver, ITodoEntryDriver
         await page.GetByTestId("new-todo-title").FillAsync(title);
     }
 
-    public Task ConfirmTitleTooLongWarningShown() =>
-        Expect(page.GetByTestId("title-too-long-warning")).ToBeVisibleAsync();
+    public Task<bool> IsTitleTooLongWarningShown() =>
+        Eventually(page.GetByTestId("title-too-long-warning"));
 
     // Helpers
+
+    // Whether the locator becomes visible within the page's default timeout.
+    // Waits for a yes, so a no takes the full timeout: to check that something
+    // is absent, wait for it to be hidden instead of negating this.
+    private static async Task<bool> Eventually(ILocator locator)
+    {
+        var result = await DriverResult.TryCatchAsync<TimeoutException>(
+            () => locator.WaitForAsync());
+        return !result.IsFailed;
+    }
 
     // Exact match title, so "" only matches a todo whose title is really blank.
     private ILocator LocateTodo(string title) =>
@@ -768,7 +782,7 @@ public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
     public async Task Add(string title)
     {
         await AttemptToAdd(title);
-        LastResult!.ShouldSucceed($"Could not add todo '{title}'");
+        ConfirmLastActionSucceeded($"Could not add todo '{title}'");
     }
 
     public async Task AttemptToComplete(string title) =>
@@ -777,22 +791,25 @@ public class TodosDsl(IChannel channel, SpecContext context) : DslBase(context)
     public async Task Complete(string title)
     {
         await AttemptToComplete(title);
-        LastResult!.ShouldSucceed($"Could not complete todo '{title}'");
+        ConfirmLastActionSucceeded($"Could not complete todo '{title}'");
     }
 
-    public Task ConfirmShown(string title) =>
-        Todos.ConfirmShown(Alias.For(title));
+    public async Task ConfirmShown(string title) =>
+        Assert.True(await Todos.IsShown(Alias.For(title)),
+            $"Expected todo '{title}' to be shown");
 
-    public Task ConfirmComplete(string title) =>
-        Todos.ConfirmComplete(Alias.For(title));
+    public async Task ConfirmComplete(string title) =>
+        Assert.True(await Todos.IsComplete(Alias.For(title)),
+            $"Expected todo '{title}' to be complete");
 
     // Live feedback while entering a todo
 
     public Task TypeTitleOfLength(int length) =>
         Entry.TypeTitle(AliasedTitleOfLength(length));
 
-    public Task ConfirmWarnedTitleIsTooLong() =>
-        Entry.ConfirmTitleTooLongWarningShown();
+    public async Task ConfirmWarnedTitleIsTooLong() =>
+        Assert.True(await Entry.IsTitleTooLongWarningShown(),
+            "Expected a warning that the title is too long");
 
     // Helpers
 

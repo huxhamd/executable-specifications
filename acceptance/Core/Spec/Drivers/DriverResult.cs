@@ -6,10 +6,6 @@ public record DriverResult(bool IsFailed, string Error = "")
     public static DriverResult Fail(string error) =>
         new(true, error);
 
-    public void ShouldSucceed(string because) =>
-        Assert.False(IsFailed, $"{because}. The system said: {Error}");
-
-
     // Operations with no result
 
     public static Task<DriverResult> TryCatchAsync(
