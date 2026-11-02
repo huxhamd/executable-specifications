@@ -1,4 +1,4 @@
-namespace acceptance.Core.Spec.Dsl;
+namespace acceptance.Core.Dsl;
 
 public class Alias
 {

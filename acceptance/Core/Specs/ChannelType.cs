@@ -1,4 +1,4 @@
-namespace acceptance.Core.Harness;
+namespace acceptance.Core.Specs;
 
 public enum ChannelType { Api, Ui }
 

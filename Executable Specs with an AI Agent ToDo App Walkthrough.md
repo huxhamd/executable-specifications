@@ -17,9 +17,9 @@ You own everything and review everything. The agent works in one of three roles 
 | `acceptance/<Domain>/Specs` | The executable specifications | Spec agent |
 | `acceptance/<Domain>/Dsl`, `acceptance/<Domain>/Channels` | The domain vocabulary the specs speak, and how each channel provides it | Spec agent |
 | `acceptance/<Domain>/Drivers` | The contract: API routes and JSON, UI test IDs | Spec agent |
-| `acceptance/Core/Spec` | What every domain's specs, DSL and drivers share | Spec agent |
+| `acceptance/Core/Dsl`, `acceptance/Core/Drivers`, `acceptance/Core/Channels` | What every domain's DSL, drivers and channels share | Spec agent |
 | `api/`, `api.Tests/`, `web/` | The app and its unit tests | App agent |
-| `acceptance/Core/Harness`, `scripts/`, `.claude/`, `CLAUDE.md`, deployment files, this guide | The harness, guardrails and deployable system | Harness agent |
+| `acceptance/Core/Specs`, `scripts/`, `.claude/`, `CLAUDE.md`, deployment files, this guide | The harness, guardrails and deployable system | Harness agent |
 
 A fourth role, the free agent, exists for cross-cutting work. Step 5 sets all this up.
 
@@ -147,22 +147,21 @@ This is the one-off setup cost. Type these files in yourself rather than pasting
 
 ```
 acceptance/
-  Core/                         shared by every domain
-    Harness/                    the test runner's plumbing (harness agent)
+  Core/                         shared by every domain, one folder per layer
+    Specs/                      the spec layer's base (harness agent)
       ChannelType.cs            which channel this run uses
       ChannelsAttribute.cs      limits a spec to some channels
       AcceptanceTestBase.cs     builds the channel and the spec's context
-    Spec/                       the shared spec layers (spec agent)
-      Dsl/
-        DslBase.cs              the base for each domain's DSL
-        Alias.cs                unique names per test
-        SpecContext.cs          what a spec shares across domains
-      Drivers/
-        DriverResult.cs         what a driver action did
-      Channels/                 one class per way of reaching the system
-        IChannel.cs
-        ApiChannel.cs
-        UiChannel.cs
+    Dsl/                        (spec agent, like the rest of acceptance/)
+      DslBase.cs                the base for each domain's DSL
+      Alias.cs                  unique names per test
+      SpecContext.cs            what a spec shares across domains
+    Drivers/
+      DriverResult.cs           what a driver action did
+    Channels/                   one class per way of reaching the system
+      IChannel.cs
+      ApiChannel.cs
+      UiChannel.cs
   Todos/                        one folder per domain (spec agent)
     Drivers/                    the domain's contract
       ITodoDriver.cs            what every channel can do with todos
@@ -179,15 +178,15 @@ acceptance/
       AcceptanceTestBase.Todos.cs   gives specs the Todos property
 ```
 
-`Core/` holds everything that isn't about one domain, split by the role that owns it. Within `Core/Spec/`, files are grouped by layer, mirroring the domain folders: `DslBase` sits in `Core/Spec/Dsl/` as `TodosDsl` sits in `Todos/Dsl/`. Every other top-level folder is a domain (`Todos/`, later perhaps `Lists/`), and holds everything about that domain: its drivers, its parts of the channel classes, its vocabulary and its specs. Adding a domain is adding one folder.
+`Core/` holds everything that isn't about one domain, grouped by layer to mirror the domain folders: `DslBase` sits in `Core/Dsl/` as `TodosDsl` sits in `Todos/Dsl/`, and `AcceptanceTestBase` sits in `Core/Specs/` as its todo part sits in `Todos/Specs/`. Folder names describe the architecture, not who owns it: ownership lives in `.claude/roles.json`, where the harness agent owns `Core/Specs/` and the spec agent owns the rest of `acceptance/`. Every other top-level folder is a domain (`Todos/`, later perhaps `Lists/`), and holds everything about that domain: its drivers, its parts of the channel classes, its vocabulary and its specs. Adding a domain is adding one folder.
 A **channel** is one way of reaching the whole system: the public API or the browser. Its driver interfaces are split by domain and by **capability**. A capability every channel must support, like `ITodoDriver`, is required. One only some channels support, like `ITodoEntryDriver` (live feedback while a new todo is being entered, which only a browser has), is optional: channels that don't support it simply don't mention it. Each channel has one driver class per domain, implementing every capability it supports, so `UiTodoDriver` implements both.
 
-### Core/Harness/ChannelType.cs
+### Core/Specs/ChannelType.cs
 
 The `ACCEPTANCE_CHANNEL` environment variable chooses the channel, so every spec runs unchanged through the API or the browser.
 
 ```csharp
-namespace acceptance.Core.Harness;
+namespace acceptance.Core.Specs;
 
 public enum ChannelType { Api, Ui }
 
@@ -215,7 +214,7 @@ public static class AcceptanceChannel
 }
 ```
 
-### Core/Harness/ChannelsAttribute.cs
+### Core/Specs/ChannelsAttribute.cs
 
 Most specs apply to every channel. A spec for behaviour only some channels have, such as a warning shown while typing, is marked `[Fact, Channels(ChannelType.Ui)]`. On other channels it is reported as skipped, so nothing disappears silently. This relies on xUnit v3's runtime skipping.
 
@@ -223,7 +222,7 @@ Most specs apply to every channel. A spec for behaviour only some channels have,
 using System.Reflection;
 using Xunit.v3;
 
-namespace acceptance.Core.Harness;
+namespace acceptance.Core.Specs;
 
 // Limits a spec to the channels it applies to: [Fact, Channels(ChannelType.Ui)].
 // Specs without it run on every channel, which should stay the default.
@@ -240,12 +239,12 @@ public sealed class ChannelsAttribute(params ChannelType[] channels) : BeforeAft
 }
 ```
 
-### Core/Spec/Dsl/Alias.cs
+### Core/Dsl/Alias.cs
 
 Every test gets its own suffix, so "Buy milk" becomes "Buy milk_3f9a1c". Tests never see each other's data, so there's no database reset and they can run in parallel, even against a system already full of data. Blank names stay blank, so you can still test empty input. `SuffixLength` lets the DSL build titles of an exact length, alias included.
 
 ```csharp
-namespace acceptance.Core.Spec.Dsl;
+namespace acceptance.Core.Dsl;
 
 public class Alias
 {
@@ -257,12 +256,12 @@ public class Alias
 }
 ```
 
-### Core/Spec/Drivers/DriverResult.cs
+### Core/Drivers/DriverResult.cs
 
 Drivers report what happened instead of throwing. The DSL decides whether that outcome was expected. The `TryCatchAsync` helpers turn an exception a driver expects, such as a Playwright timeout, into a failed result.
 
 ```csharp
-namespace acceptance.Core.Spec.Drivers;
+namespace acceptance.Core.Drivers;
 
 public record DriverResult(bool IsFailed, string Error = "")
 {
@@ -319,12 +318,12 @@ public record DriverResult(bool IsFailed, string Error = "")
 }
 ```
 
-### Core/Spec/Channels/IChannel.cs
+### Core/Channels/IChannel.cs
 
 The capabilities a channel offers. It is a partial interface with one part per domain, so each domain's members live with that domain.
 
 ```csharp
-namespace acceptance.Core.Spec.Channels;
+namespace acceptance.Core.Channels;
 
 // The capabilities one channel offers, split into one part per domain
 // (<Domain>/Channels/IChannel.<Domain>.cs). Required capabilities have no
@@ -336,12 +335,12 @@ namespace acceptance.Core.Spec.Channels;
 public partial interface IChannel;
 ```
 
-### Core/Spec/Channels/ApiChannel.cs
+### Core/Channels/ApiChannel.cs
 
 This part declares the constructor. The domain parts use `http` to create their drivers.
 
 ```csharp
-namespace acceptance.Core.Spec.Channels;
+namespace acceptance.Core.Channels;
 
 // Drives the system through its public HTTP API. Every API driver shares
 // this channel's HttpClient. Its drivers are wired up one part per domain
@@ -350,14 +349,14 @@ namespace acceptance.Core.Spec.Channels;
 public partial class ApiChannel(HttpClient http) : IChannel;
 ```
 
-### Core/Spec/Channels/UiChannel.cs
+### Core/Channels/UiChannel.cs
 
 Every UI driver shares one page, so they all act in the same browser session.
 
 ```csharp
 using Microsoft.Playwright;
 
-namespace acceptance.Core.Spec.Channels;
+namespace acceptance.Core.Channels;
 
 // Drives the system through the web app in a browser, as a user would.
 // Every UI driver shares this channel's page, so they all act in one browser
@@ -367,16 +366,16 @@ namespace acceptance.Core.Spec.Channels;
 public partial class UiChannel(IPage page) : IChannel;
 ```
 
-### Core/Spec/Dsl/SpecContext.cs
+### Core/Dsl/SpecContext.cs
 
 The DSL is organised by **business domain**, not by who is acting: specs say `Todos.Add("Buy milk")`, and later perhaps `Lists.Create(...)` or `Accounts.Register("user: Alice")`. People are data, aliased like everything else, not objects. Each domain's DSL mirrors that domain's drivers, so no single DSL class grows to hold every domain's vocabulary.
 
 Some state belongs to the spec, not to a domain: its aliases, and the outcome of its last action. Every domain's DSL shares this one context.
 
 ```csharp
-using acceptance.Core.Spec.Drivers;
+using acceptance.Core.Drivers;
 
-namespace acceptance.Core.Spec.Dsl;
+namespace acceptance.Core.Dsl;
 
 // What one spec carries across every domain's DSL: its aliases, and the
 // outcome of its last action, whichever domain that action was in.
@@ -387,14 +386,14 @@ public class SpecContext
 }
 ```
 
-### Core/Spec/Dsl/DslBase.cs
+### Core/Dsl/DslBase.cs
 
 What every domain's DSL has in common. Each action comes in two forms: `Add` must succeed and fails the test on that line if it doesn't, while `AttemptToAdd` just tries and records the outcome, so the next line can check that the rejection was the right one. `ConfirmErrorIsShown` checks that outcome, whichever domain the action was in. Confirmations are always lines of their own.
 
 ```csharp
-using acceptance.Core.Spec.Drivers;
+using acceptance.Core.Drivers;
 
-namespace acceptance.Core.Spec.Dsl;
+namespace acceptance.Core.Dsl;
 
 // The base for each business domain's DSL: Todos now, Lists or Accounts later.
 // Every domain shares the spec's context, so a spec can act in one domain and
@@ -427,16 +426,16 @@ public abstract class DslBase(SpecContext context)
 }
 ```
 
-### Core/Harness/AcceptanceTestBase.cs
+### Core/Specs/AcceptanceTestBase.cs
 
 Every spec class inherits from this. It builds the channel for this run and the spec's shared context. It knows nothing about any domain: each domain adds its DSL as a part of this partial class, in the same way it adds its drivers to the channels.
 
 ```csharp
 using Microsoft.Playwright;
-using acceptance.Core.Spec.Dsl;
-using acceptance.Core.Spec.Channels;
+using acceptance.Core.Dsl;
+using acceptance.Core.Channels;
 
-namespace acceptance.Core.Harness;
+namespace acceptance.Core.Specs;
 
 // The base for every spec. Each business domain adds its DSL as one part,
 // next to its specs (<Domain>/Specs/AcceptanceTestBase.<Domain>.cs), so specs read like
@@ -491,7 +490,7 @@ public abstract partial class AcceptanceTestBase : IAsyncLifetime
 The required todo capability: every channel implements it. The domain is in the type name, so method names don't repeat it.
 
 ```csharp
-using acceptance.Core.Spec.Drivers;
+using acceptance.Core.Drivers;
 
 namespace acceptance.Todos.Drivers;
 
@@ -532,7 +531,7 @@ The comment at the top is the API contract. You've just designed the endpoints; 
 
 ```csharp
 using System.Net.Http.Json;
-using acceptance.Core.Spec.Drivers;
+using acceptance.Core.Drivers;
 
 namespace acceptance.Todos.Drivers;
 
@@ -596,7 +595,7 @@ This comment is the UI contract: the `data-testid` attributes Angular must expos
 ```csharp
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
-using acceptance.Core.Spec.Drivers;
+using acceptance.Core.Drivers;
 
 namespace acceptance.Todos.Drivers;
 
@@ -702,13 +701,13 @@ public class UiTodoDriver(IPage page) : ITodoDriver, ITodoEntryDriver
 
 ### Todos/Channels/IChannel.Todos.cs
 
-The todo domain's part of `IChannel`. A required capability has no default. An optional one defaults to `null`, meaning "not supported", so a channel only names what it can do. The file lives in `Todos/Channels/`, but its namespace is the one in `Core/Spec/Channels/`.
+The todo domain's part of `IChannel`. A required capability has no default. An optional one defaults to `null`, meaning "not supported", so a channel only names what it can do. The file lives in `Todos/Channels/`, but its namespace is the one in `Core/Channels/`.
 
 ```csharp
 using acceptance.Todos.Drivers;
 
-// Part of IChannel (see Core/Spec/Channels/IChannel.cs), so it shares that namespace.
-namespace acceptance.Core.Spec.Channels;
+// Part of IChannel (see Core/Channels/IChannel.cs), so it shares that namespace.
+namespace acceptance.Core.Channels;
 
 public partial interface IChannel
 {
@@ -724,8 +723,8 @@ How the API channel provides the todo domain. It doesn't mention `TodoEntry`, so
 ```csharp
 using acceptance.Todos.Drivers;
 
-// Part of ApiChannel (see Core/Spec/Channels/ApiChannel.cs), so it shares that namespace.
-namespace acceptance.Core.Spec.Channels;
+// Part of ApiChannel (see Core/Channels/ApiChannel.cs), so it shares that namespace.
+namespace acceptance.Core.Channels;
 
 public partial class ApiChannel
 {
@@ -740,8 +739,8 @@ How the UI channel provides the todo domain. It builds one `UiTodoDriver` and ha
 ```csharp
 using acceptance.Todos.Drivers;
 
-// Part of UiChannel (see Core/Spec/Channels/UiChannel.cs), so it shares that namespace.
-namespace acceptance.Core.Spec.Channels;
+// Part of UiChannel (see Core/Channels/UiChannel.cs), so it shares that namespace.
+namespace acceptance.Core.Channels;
 
 // One todo driver for the browser, handed out once per capability it offers.
 public partial class UiChannel
@@ -758,8 +757,8 @@ public partial class UiChannel
 The todo vocabulary. Specs reach it as `Todos`, so method names don't repeat the word. The DSL takes the whole channel and reaches each capability through it. If a spec uses an optional capability on a channel that doesn't have it, the error says how to fix the spec.
 
 ```csharp
-using acceptance.Core.Spec.Dsl;
-using acceptance.Core.Spec.Channels;
+using acceptance.Core.Dsl;
+using acceptance.Core.Channels;
 using acceptance.Todos.Drivers;
 
 namespace acceptance.Todos.Dsl;
@@ -832,8 +831,8 @@ The todo domain's part of `AcceptanceTestBase`: the `Todos` property specs use. 
 ```csharp
 using acceptance.Todos.Dsl;
 
-// Part of AcceptanceTestBase (see Core/Harness/AcceptanceTestBase.cs), so it shares that namespace.
-namespace acceptance.Core.Harness;
+// Part of AcceptanceTestBase (see Core/Specs/AcceptanceTestBase.cs), so it shares that namespace.
+namespace acceptance.Core.Specs;
 
 public abstract partial class AcceptanceTestBase
 {
@@ -851,7 +850,7 @@ So every Claude Code session has one **role**:
 
 | Role | May change | Typical work |
 | --- | --- | --- |
-| **Spec agent** (`spec-agent`) | `acceptance/`, except `acceptance/Core/Harness` | Write specs with you, grow the DSL, design driver contracts, watch specs fail |
+| **Spec agent** (`spec-agent`) | `acceptance/`, except `acceptance/Core/Specs` | Write specs with you, grow the DSL, design driver contracts, watch specs fail |
 | **App agent** (`app-agent`) | `api/`, `api.Tests/`, `web/` | Make a committed, failing spec pass |
 | **Harness agent** (`harness-agent`) | The harness, scripts, Claude Code settings, deployment files and this guide | Improve the template, on the `template` branch |
 | **Free agent** (`free-agent`) | Anything | Cross-cutting work; changes that cross the other agents' boundaries are reported to you |
@@ -959,7 +958,7 @@ The ownership table: the single source of truth for who may change what. A folde
       "summary": "Improves the harness and the template. Writes no specs or app code.",
       "worksOnTemplate": true,
       "owns": [
-        "acceptance/Core/Harness/",
+        "acceptance/Core/Specs/",
         "acceptance/Todo.AcceptanceTests.csproj",
         ".claude/",
         "scripts/",
@@ -1056,7 +1055,8 @@ You help the human write executable specifications. You never implement them.
 
 - Work in the spec layers, one folder per domain under `acceptance/`:
   specs in `Specs`, the vocabulary in `Dsl`, and the contract in
-  `Drivers`, plus what they share in `acceptance/Core/Spec`. Keep each
+  `Drivers`, plus what they share in `acceptance/Core` (except
+  `Core/Specs`, which the harness agent owns). Keep each
   layer to its own job: specs say what, the DSL gives the words, drivers
   say how each channel reaches the system.
 - Read the app code only to understand current behaviour. Never shape a
@@ -1225,7 +1225,7 @@ This is the loop you'll repeat for every feature: write a spec, watch it fail, c
 **1. Write the spec** in `acceptance/Todos/Specs/AddingTodos.cs`. Write this first one yourself. Later, a spec agent can help: type `/spec-agent`, then `/clear`, and talk the feature through.
 
 ```csharp
-using acceptance.Core.Harness;
+using acceptance.Core.Specs;
 
 namespace acceptance.Todos.Specs;
 
@@ -1305,7 +1305,7 @@ Run the same review checklist as step 6.
 The DSL and drivers already support completing, so this one is just a spec. Create `acceptance/Todos/Specs/CompletingTodos.cs`:
 
 ```csharp
-using acceptance.Core.Harness;
+using acceptance.Core.Specs;
 
 namespace acceptance.Todos.Specs;
 

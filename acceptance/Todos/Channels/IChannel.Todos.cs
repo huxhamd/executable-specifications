@@ -1,7 +1,7 @@
 using acceptance.Todos.Drivers;
 
-// Part of IChannel (see Core/Spec/Channels/IChannel.cs), so it shares that namespace.
-namespace acceptance.Core.Spec.Channels;
+// Part of IChannel (see Core/Channels/IChannel.cs), so it shares that namespace.
+namespace acceptance.Core.Channels;
 
 public partial interface IChannel
 {

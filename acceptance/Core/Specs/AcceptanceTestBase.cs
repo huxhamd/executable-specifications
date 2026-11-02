@@ -1,8 +1,8 @@
 using Microsoft.Playwright;
-using acceptance.Core.Spec.Dsl;
-using acceptance.Core.Spec.Channels;
+using acceptance.Core.Dsl;
+using acceptance.Core.Channels;
 
-namespace acceptance.Core.Harness;
+namespace acceptance.Core.Specs;
 
 // The base for every spec. Each business domain adds its DSL as one part,
 // next to its specs (<Domain>/Specs/AcceptanceTestBase.<Domain>.cs), so specs read like

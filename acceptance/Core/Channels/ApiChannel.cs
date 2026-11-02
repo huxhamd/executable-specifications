@@ -1,4 +1,4 @@
-namespace acceptance.Core.Spec.Channels;
+namespace acceptance.Core.Channels;
 
 // Drives the system through its public HTTP API. Every API driver shares
 // this channel's HttpClient. Its drivers are wired up one part per domain

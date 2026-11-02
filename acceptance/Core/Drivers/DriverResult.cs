@@ -1,4 +1,4 @@
-namespace acceptance.Core.Spec.Drivers;
+namespace acceptance.Core.Drivers;
 
 public record DriverResult(bool IsFailed, string Error = "")
 {
