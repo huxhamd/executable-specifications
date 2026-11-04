@@ -1,4 +1,4 @@
-namespace Todo.Api.Tests;
+namespace Todo.Api.UnitTests;
 
 public class TodoStoreTests
 {
@@ -39,7 +39,7 @@ public class TodoStoreTests
     public async Task ConcurrentAddsAreAllKeptWithDistinctIds()
     {
         await Task.WhenAll(Enumerable.Range(0, 1000)
-            .Select(i => Task.Run(() => _store.Add($"Todo {i}"))));
+            .Select(i => Task.Run(() => _store.Add($"Todo {i}"), TestContext.Current.CancellationToken)));
 
         var todos = _store.All();
         Assert.Equal(1000, todos.Count);

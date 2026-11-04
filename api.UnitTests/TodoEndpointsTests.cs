@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 
-namespace Todo.Api.Tests;
+namespace Todo.Api.UnitTests;
 
 public class TodoEndpointsTests
 {
