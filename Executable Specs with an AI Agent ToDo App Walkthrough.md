@@ -18,7 +18,7 @@ You own everything and review everything. The agent works in one of three roles 
 | `acceptance.Dsl/<Domain>` | The domain vocabulary the specs speak | Spec agent |
 | `acceptance.Drivers/<Domain>` | The contract: API routes and JSON, UI test IDs, and how each channel provides them | Spec agent |
 | `acceptance.Dsl/Core`, `acceptance.Drivers/Core` | What every domain's DSL and drivers share | Spec agent |
-| `api/`, `api.Tests/`, `web/` | The app and its unit tests | App agent |
+| `api/`, `api.UnitTests/`, `api.IntegrationTests/`, `web/` | The app and its unit and integration tests | App agent |
 | `acceptance.Dsl/Core/Wiring`, `acceptance.Drivers/Core/Wiring`, `scripts/`, `.claude/`, `CLAUDE.md`, deployment files, this guide | The harness, guardrails and deployable system | Harness agent |
 
 A fourth role, the free agent, exists for cross-cutting work. Step 5 sets all this up.
@@ -913,7 +913,7 @@ So every Claude Code session has one **role**:
 | Role | May change | Typical work |
 | --- | --- | --- |
 | **Spec agent** (`spec-agent`) | `acceptance.Specs/`, `acceptance.Dsl/` and `acceptance.Drivers/`, except the harness plumbing | Write specs with you, grow the DSL, design driver contracts, watch specs fail |
-| **App agent** (`app-agent`) | `api/`, `api.Tests/`, `web/` | Make a committed, failing spec pass |
+| **App agent** (`app-agent`) | `api/`, `api.UnitTests/`, `api.IntegrationTests/`, `web/` | Make a committed, failing spec pass |
 | **Harness agent** (`harness-agent`) | The harness, scripts, Claude Code settings, deployment files and this guide | Improve the template, on the `template` branch |
 | **Free agent** (`free-agent`) | Anything | Cross-cutting work; changes that cross the other agents' boundaries are reported to you |
 
@@ -1014,7 +1014,8 @@ The ownership table: the single source of truth for who may change what. A folde
       "worksOnTemplate": false,
       "owns": [
         "api/",
-        "api.Tests/",
+        "api.UnitTests/",
+        "api.IntegrationTests/",
         "web/"
       ]
     },
@@ -1163,11 +1164,17 @@ or the harness.
 - Test-drive all logic: write each unit test before its code, and cover
   every branch, boundary, invalid input and error path. Every test must
   assert something meaningful.
-- API tests live in `api.Tests/` (`Todo.Api.Tests`); web tests use the
-  Angular project's own setup.
+- API unit tests live in `api.UnitTests/` (`Todo.Api.UnitTests`); web
+  tests use the Angular project's own setup.
 - Add narrow integration tests (one component, one real dependency) for
   persistence against a real database, framework configuration and
-  external adapters. Never re-test what acceptance specs cover.
+  external adapters. They live in `api.IntegrationTests/`
+  (`Todo.Api.IntegrationTests`), apart from the unit tests so those stay
+  fast to run. Create that project with your first integration test.
+  Never re-test what acceptance specs cover.
+- .NET test projects use xUnit v3 (`xunit.v3`), like the acceptance
+  specs. v3 test projects are executables, so set
+  `<OutputType>Exe</OutputType>`.
 - Deployment files (Dockerfiles, `docker-compose.yml`, `web/nginx.conf`)
   belong to the harness-agent. If you need a change there, ask.
 ```
@@ -1252,7 +1259,7 @@ change broke the build, undo that change only.
 3. Run `pwsh -File scripts/run-acceptance-tests.ps1`. Confirm the target spec fails
    because the behaviour is missing, not because of broken plumbing.
    If it fails for any other reason, or already passes, stop and report.
-4. Implement in small steps, following the testing rules in CLAUDE.md,
+4. Implement in small steps, following the testing rules in your role instructions,
    until the definition of done in CLAUDE.md is met.
 5. Report what changed, any design decisions you made, and anything the
    spec didn't cover that a human should decide.
@@ -1269,7 +1276,7 @@ The scripts are PowerShell, so they run the same on Windows, macOS and Linux wit
 | `scripts/set-role.ps1` | Sets the role for this worktree's next session, or shows the roles; the terminal version of the role commands |
 | `scripts/run-acceptance-tests.ps1` | Starts Docker if needed, deploys fresh containers, runs every spec on each channel, or on one with `-Channel ui` |
 | `scripts/check-ready-to-implement.ps1` | Checks the tree is clean and the named spec is committed |
-| `scripts/check-done.ps1` | The definition of done: the protected-files check, all unit tests and all acceptance tests |
+| `scripts/check-done.ps1` | The definition of done: the protected-files check, all unit tests, the API integration tests once there are any, and all acceptance tests |
 
 The ones you run most also have commands in the Claude Code chat, so they tab-complete: `/run-specs [channel]`, `/check-done` and `/check-ready <SpecName>`. Claude runs the script and summarises the result. The commands are small files in `.claude/commands/`; the scripts still work on their own in a terminal.
 

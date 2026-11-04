@@ -31,7 +31,7 @@ change broke the build, undo that change only.
 3. Run `pwsh -File scripts/run-acceptance-tests.ps1`. Confirm the target spec fails
    because the behaviour is missing, not because of broken plumbing.
    If it fails for any other reason, or already passes, stop and report.
-4. Implement in small steps, following the testing rules in CLAUDE.md,
+4. Implement in small steps, following the testing rules in your role instructions,
    until the definition of done in CLAUDE.md is met.
 5. Report what changed, any design decisions you made, and anything the
    spec didn't cover that a human should decide.

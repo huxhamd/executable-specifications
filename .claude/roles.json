@@ -16,7 +16,8 @@
       "worksOnTemplate": false,
       "owns": [
         "api/",
-        "api.Tests/",
+        "api.UnitTests/",
+        "api.IntegrationTests/",
         "web/"
       ]
     },

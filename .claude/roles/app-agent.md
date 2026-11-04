@@ -9,10 +9,16 @@ or the harness.
 - Test-drive all logic: write each unit test before its code, and cover
   every branch, boundary, invalid input and error path. Every test must
   assert something meaningful.
-- API tests live in `api.Tests/` (`Todo.Api.Tests`); web tests use the
-  Angular project's own setup.
+- API unit tests live in `api.UnitTests/` (`Todo.Api.UnitTests`); web
+  tests use the Angular project's own setup.
 - Add narrow integration tests (one component, one real dependency) for
   persistence against a real database, framework configuration and
-  external adapters. Never re-test what acceptance specs cover.
+  external adapters. They live in `api.IntegrationTests/`
+  (`Todo.Api.IntegrationTests`), apart from the unit tests so those stay
+  fast to run. Create that project with your first integration test.
+  Never re-test what acceptance specs cover.
+- .NET test projects use xUnit v3 (`xunit.v3`), like the acceptance
+  specs. v3 test projects are executables, so set
+  `<OutputType>Exe</OutputType>`.
 - Deployment files (Dockerfiles, `docker-compose.yml`, `web/nginx.conf`)
   belong to the harness-agent. If you need a change there, ask.
