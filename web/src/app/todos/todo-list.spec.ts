@@ -46,11 +46,15 @@ describe('TodoList', () => {
     ).map((element) => element.textContent?.trim() ?? '');
   }
 
-  async function submit(fixture: ComponentFixture<TodoList>, title: string): Promise<void> {
+  async function type(fixture: ComponentFixture<TodoList>, title: string): Promise<void> {
     const input = query(fixture, 'new-todo-title') as HTMLInputElement;
     input.value = title;
     input.dispatchEvent(new Event('input'));
     await fixture.whenStable();
+  }
+
+  async function submit(fixture: ComponentFixture<TodoList>, title: string): Promise<void> {
+    await type(fixture, title);
     query(fixture, 'add-todo')!.click();
     await fixture.whenStable();
   }
@@ -169,6 +173,149 @@ describe('TodoList', () => {
 
     service.addResult = of({ id: 1, title: 'Buy milk', completed: false });
     await submit(fixture, 'Buy milk');
+
+    expect(query(fixture, 'error-message')).toBeNull();
+  });
+
+  it('shows no title warning initially', async () => {
+    const fixture = await render();
+
+    expect(query(fixture, 'title-too-long-warning')).toBeNull();
+  });
+
+  it('shows no title warning for a title of exactly 255 characters', async () => {
+    const fixture = await render();
+
+    await type(fixture, 'a'.repeat(255));
+
+    expect(query(fixture, 'title-too-long-warning')).toBeNull();
+  });
+
+  it('warns while typing a title of 256 characters', async () => {
+    const fixture = await render();
+
+    await type(fixture, 'a'.repeat(256));
+
+    expect(query(fixture, 'title-too-long-warning')?.textContent?.trim()).toBe('The title is too long');
+  });
+
+  it('counts UTF-16 code units, so a surrogate pair counts as two', async () => {
+    const fixture = await render();
+
+    await type(fixture, '😀'.repeat(127) + 'a');
+    expect(query(fixture, 'title-too-long-warning')).toBeNull();
+
+    await type(fixture, '😀'.repeat(128));
+    expect(query(fixture, 'title-too-long-warning')).not.toBeNull();
+  });
+
+  for (const [description, title] of [
+    ['leading', ' ' + 'a'.repeat(255)],
+    ['trailing', 'a'.repeat(255) + ' '],
+    ['surrounding', '\t ' + 'a'.repeat(255) + ' \n'],
+  ] as const) {
+    it(`ignores ${description} whitespace when checking the title length, as the API does`, async () => {
+      const fixture = await render();
+
+      await type(fixture, title);
+
+      expect(query(fixture, 'title-too-long-warning')).toBeNull();
+    });
+  }
+
+  it('counts whitespace inside the title', async () => {
+    const fixture = await render();
+
+    await type(fixture, 'a'.repeat(127) + ' '.repeat(2) + 'a'.repeat(127));
+
+    expect(query(fixture, 'title-too-long-warning')).not.toBeNull();
+  });
+
+  it('warns when a title is too long even after trimming', async () => {
+    const fixture = await render();
+
+    await type(fixture, ' ' + 'a'.repeat(256) + ' ');
+
+    expect(query(fixture, 'title-too-long-warning')).not.toBeNull();
+  });
+
+  it('submits the title as typed, leaving trimming to the server', async () => {
+    const fixture = await render();
+
+    await submit(fixture, ' Buy milk ');
+
+    expect(service.added).toEqual([' Buy milk ']);
+  });
+
+  it('removes the title warning once the title is short enough again', async () => {
+    const fixture = await render();
+    await type(fixture, 'a'.repeat(256));
+
+    await type(fixture, 'a'.repeat(255));
+
+    expect(query(fixture, 'title-too-long-warning')).toBeNull();
+  });
+
+  it('removes the title warning when a successful add clears the title', async () => {
+    const fixture = await render();
+
+    await submit(fixture, 'a'.repeat(256));
+
+    expect(query(fixture, 'title-too-long-warning')).toBeNull();
+  });
+
+  it('still lets a too long title be submitted so the server can reject it', async () => {
+    rejectWith({ errors: { title: ['The title is too long'] } });
+    const fixture = await render();
+    const title = 'a'.repeat(256);
+
+    await type(fixture, title);
+    expect((query(fixture, 'add-todo') as HTMLButtonElement).disabled).toBe(false);
+
+    await submit(fixture, title);
+    expect(service.added).toEqual([title]);
+  });
+
+  it('shows only the error after a too long title is rejected', async () => {
+    rejectWith({ errors: { title: ['The title is too long'] } });
+    const fixture = await render();
+
+    await submit(fixture, 'a'.repeat(256));
+
+    expect(query(fixture, 'error-message')?.textContent?.trim()).toBe('The title is too long');
+    expect(query(fixture, 'title-too-long-warning')).toBeNull();
+  });
+
+  it('replaces the error with the warning when the edited title is still too long', async () => {
+    rejectWith({ errors: { title: ['The title is too long'] } });
+    const fixture = await render();
+    await submit(fixture, 'a'.repeat(257));
+
+    await type(fixture, 'a'.repeat(256));
+
+    expect(query(fixture, 'error-message')).toBeNull();
+    expect(query(fixture, 'title-too-long-warning')).not.toBeNull();
+  });
+
+  it('clears the error and shows no warning once the edited title is short enough', async () => {
+    rejectWith({ errors: { title: ['The title is too long'] } });
+    const fixture = await render();
+    await submit(fixture, 'a'.repeat(256));
+
+    await type(fixture, 'a'.repeat(255));
+
+    expect(query(fixture, 'error-message')).toBeNull();
+    expect(query(fixture, 'title-too-long-warning')).toBeNull();
+  });
+
+  it('clears the error when a retry succeeds without editing the title', async () => {
+    service.addResult = throwError(() => new HttpErrorResponse({ status: 500 }));
+    const fixture = await render();
+    await submit(fixture, 'Buy milk');
+
+    service.addResult = of({ id: 1, title: 'Buy milk', completed: false });
+    query(fixture, 'add-todo')!.click();
+    await fixture.whenStable();
 
     expect(query(fixture, 'error-message')).toBeNull();
   });

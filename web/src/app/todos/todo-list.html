@@ -3,10 +3,14 @@
     data-testid="new-todo-title"
     aria-label="New todo"
     [value]="newTitle()"
-    (input)="newTitle.set($any($event.target).value)"
+    (input)="titleEdited($any($event.target).value)"
   />
   <button type="submit" data-testid="add-todo">Add</button>
 </form>
+
+@if (showTitleTooLongWarning()) {
+  <p data-testid="title-too-long-warning" role="status">The title is too long</p>
+}
 
 @if (error(); as message) {
   <p data-testid="error-message" role="alert">{{ message }}</p>

@@ -1,6 +1,10 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Todo, TodoService } from './todo.service';
+
+// Matches the API's limit, which applies to the trimmed title.
+// String.length counts UTF-16 code units, as the API does.
+const maxTitleLength = 255;
 
 @Component({
   imports: [],
@@ -14,9 +18,18 @@ export class TodoList {
   protected readonly todos = signal<Todo[]>([]);
   protected readonly newTitle = signal('');
   protected readonly error = signal<string | null>(null);
+  // The error takes over after a rejection, so the user only ever sees one message.
+  protected readonly showTitleTooLongWarning = computed(
+    () => this.newTitle().trim().length > maxTitleLength && !this.error(),
+  );
 
   constructor() {
     this.todoService.list().subscribe((todos) => this.todos.set(todos));
+  }
+
+  protected titleEdited(title: string): void {
+    this.newTitle.set(title);
+    this.error.set(null);
   }
 
   protected add(event: Event): void {
