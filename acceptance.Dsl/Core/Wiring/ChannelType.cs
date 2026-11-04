@@ -1,4 +1,4 @@
-namespace acceptance.Core.Specs;
+namespace acceptance.Core.Dsl;
 
 // The channels a spec can run through. scripts/run-acceptance-tests.ps1 keeps
 // its own list of channel names: add or rename a channel in both places.

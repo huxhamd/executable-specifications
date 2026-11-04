@@ -1,10 +1,9 @@
-using acceptance.Core.Dsl;
-using acceptance.Core.Channels;
+using acceptance.Core.Drivers;
 
-namespace acceptance.Core.Specs;
+namespace acceptance.Core.Dsl;
 
 // The base for every spec. Each business domain adds its DSL as one part
-// (<Domain>/Specs/AcceptanceTestBase.<Domain>.cs), so specs read like
+// (<Domain>/Wiring/AcceptanceTestBase.<Domain>.cs), so specs read like
 // Todos.Add("Buy milk"). The specs themselves live in the acceptance.Specs
 // project, which sees only what's public here: this class, the DSLs it
 // exposes, ChannelType and the Channels attribute. Every part must be declared

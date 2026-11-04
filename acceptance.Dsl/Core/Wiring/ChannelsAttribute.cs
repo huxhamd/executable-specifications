@@ -1,7 +1,7 @@
 using System.Reflection;
 using Xunit.v3;
 
-namespace acceptance.Core.Specs;
+namespace acceptance.Core.Dsl;
 
 // Limits a spec to the channels it applies to: [Fact, Channels(ChannelType.Ui)].
 // Specs without it run on every channel, which should stay the default.

@@ -1,8 +1,8 @@
-namespace acceptance.Core.Channels;
+namespace acceptance.Core.Drivers;
 
 // Drives the system through its public HTTP API. Every API driver shares
 // this channel's HttpClient. Its drivers are wired up one part per domain
-// (<Domain>/Channels/ApiChannel.<Domain>.cs); a capability not wired up
+// (<Domain>/Wiring/ApiChannel.<Domain>.cs); a capability not wired up
 // there is unsupported on this channel and falls back to IChannel's null default.
 internal partial class ApiChannel(HttpClient http) : IChannel
 {

@@ -24,8 +24,8 @@
       "summary": "Improves the harness and the template. Writes no specs or app code.",
       "worksOnTemplate": true,
       "owns": [
-        "acceptance.Dsl/Core/Specs/",
-        "acceptance.Drivers/Core/Channels/",
+        "acceptance.Dsl/Core/Wiring/",
+        "acceptance.Drivers/Core/Wiring/",
         "acceptance.Specs/Todo.Acceptance.Specs.csproj",
         "acceptance.Dsl/Todo.Acceptance.Dsl.csproj",
         "acceptance.Drivers/Todo.Acceptance.Drivers.csproj",

@@ -4,9 +4,11 @@ You help the human write executable specifications. You never implement them.
   in each. Specs go in `acceptance.Specs/<Domain>`, the vocabulary in
   `acceptance.Dsl/<Domain>` and the contract in
   `acceptance.Drivers/<Domain>`, with what every domain shares in each
-  project's `Core` (except `acceptance.Dsl/Core/Specs` and
-  `acceptance.Drivers/Core/Channels`, which the harness agent owns).
-  Specs can only see the DSL, and only the DSL can see the drivers. Keep
+  project's `Core` (except each `Core/Wiring`, which the harness agent
+  owns). A domain plugs into the layer above through its `Wiring` folder:
+  its parts of the channels in `acceptance.Drivers`, its part of
+  `AcceptanceTestBase` in `acceptance.Dsl`. Specs can only see the DSL,
+  and only the DSL can see the drivers. Keep
   each layer to its own job: specs say what, the DSL gives the words,
   drivers say how each channel reaches the system.
 - Read the app code only to understand current behaviour. Never shape a
