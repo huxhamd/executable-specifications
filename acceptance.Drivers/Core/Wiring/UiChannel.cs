@@ -1,11 +1,11 @@
 using Microsoft.Playwright;
 
-namespace acceptance.Core.Channels;
+namespace acceptance.Core.Drivers;
 
 // Drives the system through the web app in a browser, as a user would.
 // Every UI driver shares this channel's page, so they all act in one browser
 // session. Its drivers are wired up one part per domain
-// (<Domain>/Channels/UiChannel.<Domain>.cs); a capability not wired up there
+// (<Domain>/Wiring/UiChannel.<Domain>.cs); a capability not wired up there
 // is unsupported on this channel and falls back to IChannel's null default.
 internal partial class UiChannel(IPage page, IBrowser browser, IPlaywright playwright) : IChannel
 {
