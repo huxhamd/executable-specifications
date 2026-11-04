@@ -1,4 +1,4 @@
-using acceptance.Core.Specs;
+using acceptance.Core.Dsl;
 
 namespace acceptance.Todos.Specs;
 
