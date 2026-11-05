@@ -20,3 +20,6 @@
   JSON shape and the UI's `data-testid` attributes.
 - Specs describe behaviour in domain language. Every spec must pass on
   every channel unless it is marked `[Fact, Channels(...)]`.
+- Specs run in parallel against one shared, running system. A spec checks
+  only what it created itself, through the DSL's aliased names, never the
+  state of the whole system, such as how many todos there are in total.

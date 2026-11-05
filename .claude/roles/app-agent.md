@@ -17,8 +17,9 @@ or the harness.
   (`Todo.Api.IntegrationTests`), apart from the unit tests so those stay
   fast to run. Create that project with your first integration test.
   Never re-test what acceptance specs cover.
-- .NET test projects use xUnit v3 (`xunit.v3`), like the acceptance
-  specs. v3 test projects are executables, so set
-  `<OutputType>Exe</OutputType>`.
+- .NET test projects use the same xUnit v3 packages and versions as
+  `acceptance.Specs/Todo.Acceptance.Specs.csproj` (`xunit.v3.mtp-off`
+  and `xunit.runner.visualstudio`). v3 test projects are executables, so
+  set `<OutputType>Exe</OutputType>`.
 - Deployment files (Dockerfiles, `docker-compose.yml`, `web/nginx.conf`)
   belong to the harness-agent. If you need a change there, ask.

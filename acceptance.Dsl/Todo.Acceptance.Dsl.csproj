@@ -16,8 +16,9 @@
 
   <ItemGroup>
     <!-- xUnit's library for extensions, not its test runner: this project holds no tests. -->
-    <PackageReference Include="xunit.v3.extensibility.core" Version="3.2.0" />
-    <PackageReference Include="xunit.v3.assert" Version="3.2.0" />
+    <!-- Keep these on the same version as xunit.v3.mtp-off in ../acceptance.Specs. -->
+    <PackageReference Include="xunit.v3.extensibility.core" Version="4.0.2" />
+    <PackageReference Include="xunit.v3.assert" Version="4.0.2" />
   </ItemGroup>
 
   <ItemGroup>
