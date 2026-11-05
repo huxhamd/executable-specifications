@@ -18,8 +18,15 @@
   <ItemGroup>
     <PackageReference Include="coverlet.collector" Version="6.0.4" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
-    <PackageReference Include="xunit.v3" Version="3.2.0" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+    <!--
+      xUnit v3 4.x, for running specs in the same class in parallel (see
+      Core/Wiring/Parallelization.cs). The mtp-off package keeps `dotnet test`
+      on VSTest: plain xunit.v3 4.x only runs on Microsoft Testing Platform v2,
+      which `dotnet test` on the .NET 10 SDK doesn't use unless global.json
+      asks for it.
+    -->
+    <PackageReference Include="xunit.v3.mtp-off" Version="4.0.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0" />
   </ItemGroup>
 
   <ItemGroup>

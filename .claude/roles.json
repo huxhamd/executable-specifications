@@ -27,6 +27,7 @@
       "owns": [
         "acceptance.Dsl/Core/Wiring/",
         "acceptance.Drivers/Core/Wiring/",
+        "acceptance.Specs/Core/Wiring/",
         "acceptance.Specs/Todo.Acceptance.Specs.csproj",
         "acceptance.Dsl/Todo.Acceptance.Dsl.csproj",
         "acceptance.Drivers/Todo.Acceptance.Drivers.csproj",

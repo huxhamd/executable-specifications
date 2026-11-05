@@ -72,12 +72,13 @@ cd ..
 dotnet new xunit -n Todo.Acceptance.Specs -o acceptance.Specs
 cd acceptance.Specs
 dotnet remove package xunit
-dotnet add package xunit.v3
+dotnet add package xunit.v3.mtp-off
+dotnet add package xunit.runner.visualstudio
 dotnet add reference ../acceptance.Dsl/Todo.Acceptance.Dsl.csproj
 cd ..
 ```
 
-Each layer gets its own project, so the compiler enforces the layering. The drivers' types are `internal`, and `acceptance.Drivers` lets only the DSL see them: add `<ItemGroup><InternalsVisibleTo Include="Todo.Acceptance.Dsl" /></ItemGroup>` to `acceptance.Drivers/Todo.Acceptance.Drivers.csproj`. In the same file, add `PrivateAssets="compile;contentfiles;analyzers;build"` to the `Microsoft.Playwright` package reference, so only the drivers can compile against Playwright. That's NuGet's default plus `compile`: the specs still get Playwright and its browser driver at runtime. The DSL holds no tests, so it uses xUnit's extensibility and assertion packages rather than the test runner; add `<ItemGroup><Using Include="Xunit" /></ItemGroup>` to its project file, as the specs' already has. The drivers have no xUnit at all, so they can't assert. The `xunit` template still uses xUnit v2. The plumbing needs v3, for the `Channels` attribute's runtime skipping, which is why the package is swapped. v3 test projects are executables, so add `<OutputType>Exe</OutputType>` to the `PropertyGroup` in `acceptance.Specs/Todo.Acceptance.Specs.csproj`. Then delete the templates' two `Class1.cs` files and `UnitTest1.cs`, and install the browser:
+Each layer gets its own project, so the compiler enforces the layering. The drivers' types are `internal`, and `acceptance.Drivers` lets only the DSL see them: add `<ItemGroup><InternalsVisibleTo Include="Todo.Acceptance.Dsl" /></ItemGroup>` to `acceptance.Drivers/Todo.Acceptance.Drivers.csproj`. In the same file, add `PrivateAssets="compile;contentfiles;analyzers;build"` to the `Microsoft.Playwright` package reference, so only the drivers can compile against Playwright. That's NuGet's default plus `compile`: the specs still get Playwright and its browser driver at runtime. The DSL holds no tests, so it uses xUnit's extensibility and assertion packages rather than the test runner; add `<ItemGroup><Using Include="Xunit" /></ItemGroup>` to its project file, as the specs' already has. The drivers have no xUnit at all, so they can't assert. The `xunit` template still uses xUnit v2. The plumbing needs v3, for the `Channels` attribute's runtime skipping, and v3 4.0 or later, for running specs in the same class in parallel, which is why the package is swapped. `xunit.v3.mtp-off` is v3 for VSTest, which is what `dotnet test` uses unless you opt in to Microsoft Testing Platform; plain `xunit.v3` 4.x only works with the latter. Keep every xUnit package, in the DSL as well as the specs, on the same version. v3 test projects are executables, so add `<OutputType>Exe</OutputType>` to the `PropertyGroup` in `acceptance.Specs/Todo.Acceptance.Specs.csproj`. Then delete the templates' two `Class1.cs` files and `UnitTest1.cs`, and install the browser:
 
 ```bash
 dotnet build acceptance.Specs
@@ -190,12 +191,15 @@ acceptance.Dsl/                 the DSL layer: the words specs use
     Wiring/                     the domain's part of the spec base
       AcceptanceTestBase.Todos.cs   gives specs the Todos property
 acceptance.Specs/               the spec layer: the specs, one folder per domain
+  Core/
+    Wiring/                     how the specs are run (harness agent)
+      Parallelization.cs        runs every spec in parallel
   Todos/                        empty for now
 ```
 
 Each layer is its own project, and each project has a `Core/` folder for what every domain shares and one folder per domain (`Todos/`, later perhaps `Lists/`). Adding a domain is adding one folder in each project.
 
-Every `Core/` and domain folder in `acceptance.Drivers` and `acceptance.Dsl` has the same shape: the layer's own code, and a `Wiring/` folder that connects it to the layer above, one part per domain. In the drivers, the wiring is the channels the DSL is given; in the DSL, it's the spec base that specs inherit. `acceptance.Specs` has no wiring, because nothing sits above it. Folder names describe the architecture, not who owns it: ownership lives in `.claude/roles.json`, where the harness agent owns each `Core/Wiring/` and the spec agent owns the rest.
+Every `Core/` and domain folder in `acceptance.Drivers` and `acceptance.Dsl` has the same shape: the layer's own code, and a `Wiring/` folder that connects it to the layer above, one part per domain. In the drivers, the wiring is the channels the DSL is given; in the DSL, it's the spec base that specs inherit. `acceptance.Specs` has nothing above it to connect to, so its only wiring is how the specs are run. Folder names describe the architecture, not who owns it: ownership lives in `.claude/roles.json`, where the harness agent owns each `Core/Wiring/` and the spec agent owns the rest.
 
 The projects reference each other in one direction only, and the compiler enforces the layering:
 
@@ -604,6 +608,20 @@ public abstract partial class AcceptanceTestBase : IAsyncLifetime
         if (_channel is not null) await _channel.DisposeAsync();
     }
 }
+```
+
+### acceptance.Specs/Core/Wiring/Parallelization.cs
+
+xUnit runs spec classes in parallel, but by default runs the specs inside one class one at a time. This turns that off, so every spec runs alongside every other, and a spec that quietly depends on another one fails straight away. It's an assembly attribute, so it has to live in the specs' project; it sits in `Core/Wiring/` so the harness agent owns it, like the rest of the wiring.
+
+```csharp
+// Runs every spec in parallel, including specs in the same class. xUnit's
+// default runs each class's specs one at a time, which would hide a spec
+// that depends on another spec, or on the state of the whole system.
+// How many specs run at once is set per channel, in
+// scripts/run-acceptance-tests.ps1. This is harness wiring, owned by the
+// harness agent like every project's Core/Wiring: specs don't need it.
+[assembly: Xunit.v3.Parallelization(Mode = Xunit.Sdk.ParallelMode.All)]
 ```
 
 ### acceptance.Drivers/Todos/ITodoDriver.cs
@@ -1080,6 +1098,7 @@ The ownership table: the single source of truth for who may change what. A folde
       "owns": [
         "acceptance.Dsl/Core/Wiring/",
         "acceptance.Drivers/Core/Wiring/",
+        "acceptance.Specs/Core/Wiring/",
         "acceptance.Specs/Todo.Acceptance.Specs.csproj",
         "acceptance.Dsl/Todo.Acceptance.Dsl.csproj",
         "acceptance.Drivers/Todo.Acceptance.Drivers.csproj",
@@ -1227,9 +1246,10 @@ or the harness.
   (`Todo.Api.IntegrationTests`), apart from the unit tests so those stay
   fast to run. Create that project with your first integration test.
   Never re-test what acceptance specs cover.
-- .NET test projects use xUnit v3 (`xunit.v3`), like the acceptance
-  specs. v3 test projects are executables, so set
-  `<OutputType>Exe</OutputType>`.
+- .NET test projects use the same xUnit v3 packages and versions as
+  `acceptance.Specs/Todo.Acceptance.Specs.csproj` (`xunit.v3.mtp-off`
+  and `xunit.runner.visualstudio`). v3 test projects are executables, so
+  set `<OutputType>Exe</OutputType>`.
 - Deployment files (Dockerfiles, `docker-compose.yml`, `web/nginx.conf`)
   belong to the harness-agent. If you need a change there, ask.
 ```
