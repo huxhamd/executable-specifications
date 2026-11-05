@@ -166,7 +166,7 @@ acceptance.Drivers/             the driver layer: how each channel reaches the s
     Wiring/                     one channel per way of reaching the system (harness agent)
       IChannel.cs
       ApiChannel.cs             opens and closes the HttpClient
-      UiChannel.cs              opens and closes the browser
+      UiChannel.cs              shares one browser, opens a session per spec
   Todos/                        one folder per domain: the domain's contract
     ITodoDriver.cs              what every channel can do with todos
     ITodoEntryDriver.cs         live feedback while entering a todo (UI only)
@@ -377,7 +377,7 @@ internal partial interface IChannel : IAsyncDisposable;
 
 ### acceptance.Drivers/Core/Wiring/ApiChannel.cs
 
-This part declares the constructor and opens and closes the `HttpClient`. The domain parts use `http` to create their drivers.
+This part declares the constructor and opens and closes the `HttpClient`. The domain parts use `http` to create their drivers. Specs run in parallel, so every spec's client shares one connection pool for the whole run, the same way the UI channel shares one browser.
 
 ```csharp
 namespace acceptance.Core.Drivers;
@@ -391,9 +391,16 @@ internal partial class ApiChannel(HttpClient http) : IChannel
     // Kept as a field, so the domain parts can use http in their initialisers.
     private readonly HttpClient _http = http;
 
-    public static ApiChannel Open(string baseUrl) =>
-        new(new HttpClient { BaseAddress = new Uri(baseUrl) });
+    // One connection pool for the whole test run, as the UI channel shares
+    // one browser: specs run in parallel, and a pool per spec would leave a
+    // closed connection behind for every spec. Each spec still gets its own
+    // HttpClient, so nothing one spec sets on it reaches another.
+    private static readonly SocketsHttpHandler SharedConnections = new();
 
+    public static ApiChannel Open(string baseUrl) =>
+        new(new HttpClient(SharedConnections, disposeHandler: false) { BaseAddress = new Uri(baseUrl) });
+
+    // Closes this spec's client. The shared connections stay open for the other specs.
     public ValueTask DisposeAsync()
     {
         _http.Dispose();
@@ -404,7 +411,9 @@ internal partial class ApiChannel(HttpClient http) : IChannel
 
 ### acceptance.Drivers/Core/Wiring/UiChannel.cs
 
-It starts Playwright, launches the browser and opens the page, and closes them all when disposed. Every UI driver shares one page, so they all act in the same browser session.
+Launching a browser takes about a second, so it happens once per test run, and every UI spec shares that browser. Each spec opens its own *browser context* instead: a private session with its own cookies and storage, which opens in milliseconds and is as isolated as a separate browser. The spec's page lives in that context, and disposing the channel closes it. Every UI driver shares the page, so within one spec they all act in the same session.
+
+The pattern is the same on both channels: what's expensive to start is shared by the whole run, and what holds state belongs to one spec. That's what lets specs run in parallel without slowing each other down or leaking into each other.
 
 ```csharp
 using Microsoft.Playwright;
@@ -412,29 +421,54 @@ using Microsoft.Playwright;
 namespace acceptance.Core.Drivers;
 
 // Drives the system through the web app in a browser, as a user would.
-// Every UI driver shares this channel's page, so they all act in one browser
-// session. Its drivers are wired up one part per domain
+// Specs run in parallel, so every spec in a test run shares one browser,
+// and each spec gets its own browser context: a private session with its
+// own cookies and storage, cheap to open and isolated from every other spec.
+// Every UI driver shares this channel's page, so within one spec they all
+// act in the same session. Its drivers are wired up one part per domain
 // (<Domain>/Wiring/UiChannel.<Domain>.cs); a capability not wired up there
 // is unsupported on this channel and falls back to IChannel's null default.
-internal partial class UiChannel(IPage page, IBrowser browser, IPlaywright playwright) : IChannel
+internal partial class UiChannel(IPage page, IBrowserContext context) : IChannel
 {
-    // Kept as fields, so the domain parts can use page in their initialisers.
-    private readonly IBrowser _browser = browser;
-    private readonly IPlaywright _playwright = playwright;
+    // Kept as a field, so DisposeAsync can close it. The domain parts use
+    // page in their initialisers.
+    private readonly IBrowserContext _context = context;
 
-    public static async Task<UiChannel> OpenAsync(string baseUrl)
+    public static async Task<UiChannel> OpenAsync(string baseUrl, TimeSpan timeout)
+    {
+        var browser = await SharedBrowser.Value;
+        var context = await browser.NewContextAsync(new() { BaseURL = baseUrl });
+        context.SetDefaultTimeout((float)timeout.TotalMilliseconds);
+        var page = await context.NewPageAsync();
+        return new UiChannel(page, context);
+    }
+
+    // Closes this spec's session. The browser stays open for the other specs.
+    public async ValueTask DisposeAsync() => await _context.CloseAsync();
+
+    // Launched by the first UI spec and shared for the rest of the run. Lazy
+    // makes sure specs starting at the same time launch it only once. If the
+    // launch fails, every UI spec reports that same failure.
+    private static readonly Lazy<Task<IBrowser>> SharedBrowser = new(LaunchBrowserAsync);
+
+    private static async Task<IBrowser> LaunchBrowserAsync()
     {
         var playwright = await Playwright.CreateAsync();
         var browser = await playwright.Chromium.LaunchAsync();
-        var page = await browser.NewPageAsync(new() { BaseURL = baseUrl });
-        page.SetDefaultTimeout(5_000);
-        return new UiChannel(page, browser, playwright);
-    }
 
-    public async ValueTask DisposeAsync()
-    {
-        await _browser.CloseAsync();
-        _playwright.Dispose();
+        // Closed when the test run ends, not after any one spec. The run is
+        // over by then, so a failure here has nobody to report to, and the
+        // browser closes with the test process anyway.
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            try
+            {
+                browser.CloseAsync().GetAwaiter().GetResult();
+                playwright.Dispose();
+            }
+            catch (Exception) { }
+        };
+        return browser;
     }
 }
 ```
@@ -509,9 +543,10 @@ public abstract class DslBase
 
 ### acceptance.Dsl/Core/Wiring/AcceptanceTestBase.cs
 
-Every spec class inherits from this. It picks the channel for this run, which opens and closes what it drives, and holds the spec's shared context. It knows nothing about any domain: each domain adds its DSL as a part of this partial class, in the same way it adds its drivers to the channels.
+Every spec class inherits from this. It picks the channel for this run, which opens and closes what it drives, and holds the spec's shared context. It knows nothing about any domain: each domain adds its DSL as a part of this partial class, in the same way it adds its drivers to the channels. It also reads how long the UI channel waits for the page, from `ACCEPTANCE_UI_TIMEOUT_SECONDS` (5 seconds by default), so a slow machine is fixed in one place rather than in the drivers.
 
 ```csharp
+using System.Globalization;
 using acceptance.Core.Drivers;
 
 namespace acceptance.Core.Dsl;
@@ -542,9 +577,26 @@ public abstract partial class AcceptanceTestBase : IAsyncLifetime
         _channel = AcceptanceChannel.Current switch
         {
             ChannelType.Api => ApiChannel.Open(BaseUrl),
-            ChannelType.Ui => await UiChannel.OpenAsync(BaseUrl),
+            ChannelType.Ui => await UiChannel.OpenAsync(BaseUrl, UiTimeout),
             var other => throw new InvalidOperationException($"No channel set up for {other}.")
         };
+    }
+
+    // How long the UI channel waits for the page before giving up. Specs run
+    // in parallel, so a busy machine may need longer: set
+    // ACCEPTANCE_UI_TIMEOUT_SECONDS rather than changing a driver.
+    private static TimeSpan UiTimeout
+    {
+        get
+        {
+            const string variable = "ACCEPTANCE_UI_TIMEOUT_SECONDS";
+            var value = Environment.GetEnvironmentVariable(variable)?.Trim();
+            if (string.IsNullOrEmpty(value)) return TimeSpan.FromSeconds(5);
+
+            return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) && seconds > 0
+                ? TimeSpan.FromSeconds(seconds)
+                : throw new InvalidOperationException($"{variable} must be a number of seconds, not '{value}'.");
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -989,6 +1041,9 @@ The working agreement every session shares, whatever its role. Claude Code reads
   JSON shape and the UI's `data-testid` attributes.
 - Specs describe behaviour in domain language. Every spec must pass on
   every channel unless it is marked `[Fact, Channels(...)]`.
+- Specs run in parallel against one shared, running system. A spec checks
+  only what it created itself, through the DSL's aliased names, never the
+  state of the whole system, such as how many todos there are in total.
 ```
 
 **`.claude/roles.json`**
@@ -1288,7 +1343,11 @@ The role machinery lives beside the settings that wire it up. You don't run it d
 | `.claude/hooks/roles.ps1` | Shared by the hooks and the role scripts: reads `roles.json`, works out who owns a path, tracks what changed |
 | `.claude/hooks/check-protected-files.ps1` | Fails if an uncommitted change is outside the role of the last session started here; `check-done.ps1` runs it |
 
-The channel names are listed twice, in the `ChannelType` enum and in `run-acceptance-tests.ps1`, and each points to the other: add or rename a channel in both. `run-acceptance-tests.ps1` uses `--force-recreate`, so every run gets fresh containers and data doesn't build up across runs. Within a run both channels share one system, which is fine because aliasing keeps specs apart. If Docker isn't running, it starts Docker Desktop and waits; to avoid the wait, turn on *Start Docker Desktop when you sign in* in Docker Desktop's general settings.
+The channel names are listed twice, in the `ChannelType` enum and in `run-acceptance-tests.ps1`, and each points to the other: add or rename a channel in both. `run-acceptance-tests.ps1` uses `--force-recreate`, so every run gets fresh containers and data doesn't build up across runs. Within a run both channels share one system, which is fine because aliasing keeps specs apart.
+
+Specs run in parallel, against that one system. Running them in parallel by default makes the suite faster, but the main reason is that it keeps the specs honest: a spec that depends on what other specs did, or on the whole system being in a particular state, fails now, while it's one spec, rather than after hundreds of specs have come to depend on running one at a time. The script sets how many specs run at once on each channel, in `$parallelSpecs` at the top: wide for the API, narrower for the UI, where each spec drives a real page. If UI specs time out only when the whole suite runs, lower the UI number or raise `ACCEPTANCE_UI_TIMEOUT_SECONDS`.
+
+If Docker isn't running, it starts Docker Desktop and waits; to avoid the wait, turn on *Start Docker Desktop when you sign in* in Docker Desktop's general settings.
 
 To run one channel by itself, for example while writing a spec, start the stack and set the channel for that run:
 
@@ -1437,6 +1496,8 @@ This is the payoff: big implementation changes with zero changes to the acceptan
 2. **Restyle the UI.** Ask for a full visual redesign or a component library. The drivers rely only on test IDs, so the specs survive.
 3. **Test the lock.** Write a spec the app can't reasonably satisfy, such as an assertion with a typo in the expected message, and ask the agent to "make the build green". It should stop and flag the spec rather than edit it. If it tries anyway, the role hooks will block or catch it. Then try the opposite with a spec agent: ask it to implement the feature its spec describes.
 
+4. **Check the whole system, then don't.** Write a spec that checks something about every todo, such as how many are shown, or that only the todos it added are there. It may pass when you run it alone, but it fails in the full suite, because other specs are adding todos to the same system at the same time. Then rewrite it to check only what it created: "given I add three todos, when I complete two of them, then only one of *those* is still to do". Every todo app has other people's data in it; a spec that only talks about its own data is true however much else is there.
+
 If a spec breaks during 1 or 2, look at why. It usually means the spec or driver leaked an implementation detail, which is exactly the feedback this approach is meant to give you.
 
 ## Troubleshooting
@@ -1451,6 +1512,8 @@ If a spec breaks during 1 or 2, look at why. It usually means the spec or driver
 | Playwright says no browser is installed | Re-run the `playwright.ps1 install chromium` step after any package upgrade |
 | Old behaviour after the agent's changes | You started the stack by hand without `--build`; `scripts/run-acceptance-tests.ps1` always rebuilds |
 | A spec is reported as skipped | It's limited to other channels with `[Channels(...)]`, which is expected |
+| A spec passes alone but fails in the full suite | It depends on other specs, or checks the whole system; make it check only what it created |
+| UI specs time out only when the whole suite runs | The machine is overloaded; lower `ui` in `$parallelSpecs` in `run-acceptance-tests.ps1`, or raise `ACCEPTANCE_UI_TIMEOUT_SECONDS` |
 | `check-ready-to-implement.ps1` fails | Commit everything, including the spec, and name the spec method exactly |
 | The agent says no role is set, or every edit is blocked | Type `/<role>`, for example `/app-agent`, then `/clear` |
 | The agent still has its old role | Sessions keep the role they started with; type `/clear` to start a fresh one |

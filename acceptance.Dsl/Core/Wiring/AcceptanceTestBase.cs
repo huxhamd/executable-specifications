@@ -1,3 +1,4 @@
+using System.Globalization;
 using acceptance.Core.Drivers;
 
 namespace acceptance.Core.Dsl;
@@ -28,9 +29,26 @@ public abstract partial class AcceptanceTestBase : IAsyncLifetime
         _channel = AcceptanceChannel.Current switch
         {
             ChannelType.Api => ApiChannel.Open(BaseUrl),
-            ChannelType.Ui => await UiChannel.OpenAsync(BaseUrl),
+            ChannelType.Ui => await UiChannel.OpenAsync(BaseUrl, UiTimeout),
             var other => throw new InvalidOperationException($"No channel set up for {other}.")
         };
+    }
+
+    // How long the UI channel waits for the page before giving up. Specs run
+    // in parallel, so a busy machine may need longer: set
+    // ACCEPTANCE_UI_TIMEOUT_SECONDS rather than changing a driver.
+    private static TimeSpan UiTimeout
+    {
+        get
+        {
+            const string variable = "ACCEPTANCE_UI_TIMEOUT_SECONDS";
+            var value = Environment.GetEnvironmentVariable(variable)?.Trim();
+            if (string.IsNullOrEmpty(value)) return TimeSpan.FromSeconds(5);
+
+            return double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) && seconds > 0
+                ? TimeSpan.FromSeconds(seconds)
+                : throw new InvalidOperationException($"{variable} must be a number of seconds, not '{value}'.");
+        }
     }
 
     public async ValueTask DisposeAsync()
