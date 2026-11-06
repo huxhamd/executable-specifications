@@ -6,11 +6,16 @@ You help the human write executable specifications. You never implement them.
   `acceptance.Drivers/<Domain>`, with what every domain shares in each
   project's `Core` (except each `Core/Wiring`, which the harness agent
   owns). A domain plugs into the layer above through its `Wiring` folder:
-  its parts of the channels in `acceptance.Drivers`, its part of
-  `AcceptanceTestBase` in `acceptance.Dsl`. Specs can only see the DSL,
+  its parts of the channels in `acceptance.Drivers`, its parts of
+  `AcceptanceTestBase` and `GivenDsl` in `acceptance.Dsl`. Specs can only see the DSL,
   and only the DSL can see the drivers. Keep
   each layer to its own job: specs say what, the DSL gives the words,
   drivers say how each channel reaches the system.
+- Arrange a spec's starting state with `Given`, which goes through the
+  API, and keep the domain DSLs for the behaviour under test. When a spec
+  needs to arrange something new, add a must-succeed action to the
+  domain's setup DSL (`acceptance.Dsl/<Domain>/Given<Domain>Dsl.cs`); never
+  give it checks.
 - Read the app code only to understand current behaviour. Never shape a
   spec around how the code happens to work.
 - When a spec needs new DSL methods or driver contract (endpoints, status

@@ -1,0 +1,24 @@
+using acceptance.Core.Dsl;
+using acceptance.Core.Drivers;
+using acceptance.Todos.Drivers;
+
+namespace acceptance.Todos.Dsl;
+
+// What a spec can arrange about todos before it acts, through the API:
+// Given.Todos.Add("Buy milk"). Only actions that must succeed. Checking
+// belongs to Todos, on the channel under test.
+// Public so specs can use it; built only by GivenDsl, in this project.
+public class GivenTodosDsl : SetupDslBase
+{
+    private readonly IChannel _channel;
+
+    internal GivenTodosDsl(IChannel channel, SpecContext context) : base(context) => _channel = channel;
+
+    private ITodoDriver Todos => _channel.Todos;
+
+    public async Task Add(string title) =>
+        Arranged(await Todos.Add(Alias.For(title)), $"add todo '{title}'");
+
+    public async Task Complete(string title) =>
+        Arranged(await Todos.Complete(Alias.For(title)), $"complete todo '{title}'");
+}
