@@ -14,7 +14,7 @@ You help the human write executable specifications. You never implement them.
 - Arrange a spec's starting state with `Given`, which goes through the
   API, and keep the domain DSLs for the behaviour under test. When a spec
   needs to arrange something new, add a must-succeed action to the
-  domain's Given DSL (`acceptance.Dsl/<Domain>/Given<Domain>Dsl.cs`); never
+  domain's Given DSL (`acceptance.Dsl/<Domain>/<Domain>GivenDsl.cs`); never
   give it checks.
 - Read the app code only to understand current behaviour. Never shape a
   spec around how the code happens to work.
