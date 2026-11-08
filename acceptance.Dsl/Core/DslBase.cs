@@ -6,30 +6,40 @@ namespace acceptance.Core.Dsl;
 // Every domain shares the spec's context, so a spec can act in one domain and
 // check the outcome from any of them.
 //
-// Specs live in another project and see only the public members: the DSL's
-// vocabulary. What a DSL is built from (drivers, channels, the spec context)
-// is internal, so the constructor and the helpers below are private protected.
-public abstract class DslBase
+// One DSL class serves both roles. Specs never see the class, only the
+// interfaces it implements: I<Domain>TestDsl as Todos., I<Domain>GivenDsl as
+// Given.Todos. Each domain's DSL builds itself for a role through its own
+// ForTest and ForGiven factories, and the role comes with the context: a
+// Given context records into its own last result, and turns a failed
+// must-succeed action into a GivenFailedException instead of an assertion.
+internal abstract class DslBase : ITestDsl
 {
     private readonly SpecContext _context;
 
-    private protected DslBase(SpecContext context) => _context = context;
+    protected DslBase(SpecContext context) => _context = context;
 
-    private protected Alias Alias => _context.Alias;
+    protected Alias Alias => _context.Alias;
 
-    private protected void Record(DriverResult result) => _context.LastResult = result;
+    protected void Record(DriverResult result) => _context.LastResult = result;
 
     // Drivers report what happened; the DSL decides whether that passes.
-    private protected void ConfirmLastActionSucceeded(string because)
+    protected void ConfirmLastActionSucceeded(string because)
     {
-        Assert.NotNull(_context.LastResult);
-        Assert.False(_context.LastResult.IsFailed, $"{because}. The system said: {_context.LastResult.Error}");
+        var result = _context.LastResult
+            ?? throw new InvalidOperationException("No action has been recorded to confirm.");
+        if (!result.IsFailed) return;
+
+        var failure = $"{because}. The system said: {result.Error}";
+        if (_context.IsGiven) throw new GivenFailedException($"A Given step failed: {failure}");
+        Assert.Fail(failure);
     }
 
-    private protected static T Require<T>(T? capability, string description) where T : class =>
-        capability ?? throw new InvalidOperationException(
-            $"This spec uses {description}, which this channel does not support. " +
-            "Limit it to the channels that do, e.g. [Fact, Channels(ChannelType.Ui)].");
+    protected T Require<T>(T? capability, string description) where T : class =>
+        capability ?? throw new InvalidOperationException(_context.IsGiven
+            ? $"This spec arranges {description} with Given, which goes through the API, " +
+              "and the API does not support it. Add it to the API's drivers, or arrange it another way."
+            : $"This spec uses {description}, which this channel does not support. " +
+              "Limit it to the channels that do, e.g. [Fact, Channels(ChannelType.Ui)].");
 
     public Task ConfirmErrorIsShown(string message)
     {

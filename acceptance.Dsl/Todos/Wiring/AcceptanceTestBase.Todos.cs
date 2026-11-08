@@ -5,5 +5,5 @@ namespace acceptance.Core.Dsl;
 
 public abstract partial class AcceptanceTestBase
 {
-    protected TodosDsl Todos => field ??= new TodosDsl(Channel, Context);
+    protected ITodosTestDsl Todos => field ??= TodosDsl.ForTest(Channel, Context);
 }
