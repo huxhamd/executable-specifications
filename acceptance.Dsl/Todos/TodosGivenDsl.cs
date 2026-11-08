@@ -9,11 +9,11 @@ namespace acceptance.Todos.Dsl;
 // Given.Todos.Add("Buy milk"). Only actions that must succeed. Checking
 // belongs to Todos, on the channel under test.
 // Public so specs can use it; built only by Given, in this project.
-public class GivenTodosDsl : GivenDslBase
+public class TodosGivenDsl : GivenDslBase
 {
     private readonly IChannel _channel;
 
-    internal GivenTodosDsl(IChannel channel, SpecContext context) : base(context) => _channel = channel;
+    internal TodosGivenDsl(IChannel channel, SpecContext context) : base(context) => _channel = channel;
 
     private ITodoDriver Todos => _channel.Todos;
 
