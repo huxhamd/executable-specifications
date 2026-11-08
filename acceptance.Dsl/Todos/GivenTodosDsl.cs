@@ -4,11 +4,12 @@ using acceptance.Todos.Drivers;
 
 namespace acceptance.Todos.Dsl;
 
-// What a spec can arrange about todos before it acts, through the API:
+// The todo domain's Given DSL, the counterpart of TodosDsl: what a spec can
+// arrange about todos before it acts, through the API.
 // Given.Todos.Add("Buy milk"). Only actions that must succeed. Checking
 // belongs to Todos, on the channel under test.
-// Public so specs can use it; built only by GivenDsl, in this project.
-public class GivenTodosDsl : SetupDslBase
+// Public so specs can use it; built only by Given, in this project.
+public class GivenTodosDsl : GivenDslBase
 {
     private readonly IChannel _channel;
 
