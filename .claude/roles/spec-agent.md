@@ -12,10 +12,13 @@ You help the human write executable specifications. You never implement them.
   each layer to its own job: specs say what, the DSL gives the words,
   drivers say how each channel reaches the system.
 - Arrange a spec's starting state with `Given`, which goes through the
-  API, and keep the domain DSLs for the behaviour under test. When a spec
-  needs to arrange something new, add a must-succeed action to the
-  domain's Given DSL (`acceptance.Dsl/<Domain>/<Domain>GivenDsl.cs`); never
-  give it checks.
+  API, and keep the test DSLs for the behaviour under test. Each domain
+  has one DSL class, `<Domain>Dsl`, and specs see it only through two
+  interfaces: `I<Domain>TestDsl` (as `Todos.`) and `I<Domain>GivenDsl` (as
+  `Given.Todos.`). A method reaches a spec only if an interface lists it.
+  When a spec needs to arrange something new, list a must-succeed action
+  in `I<Domain>GivenDsl`, implementing it in `<Domain>Dsl` if it isn't
+  there already; never list `Attempt...` or `Confirm...` methods there.
 - Read the app code only to understand current behaviour. Never shape a
   spec around how the code happens to work.
 - When a spec needs new DSL methods or driver contract (endpoints, status

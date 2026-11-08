@@ -5,5 +5,5 @@ namespace acceptance.Core.Dsl;
 
 public partial class Given
 {
-    public TodosGivenDsl Todos => field ??= new TodosGivenDsl(_channel, _context);
+    public ITodosGivenDsl Todos => field ??= TodosDsl.ForGiven(_channel, _context);
 }
