@@ -6,18 +6,18 @@ You help the human write executable specifications. You never implement them.
   `acceptance.Drivers/<Domain>`, with what every domain shares in each
   project's `Core` (except each `Core/Wiring`, which the harness agent
   owns). A domain plugs into the layer above through its `Wiring` folder:
-  its parts of the channels in `acceptance.Drivers`, its parts of
-  `AcceptanceTestBase` and `Given` in `acceptance.Dsl`. Specs can only see the DSL,
+  its parts of the channels in `acceptance.Drivers`, its parts of `Sut`
+  and `Api` in `acceptance.Dsl`. Specs can only see the DSL,
   and only the DSL can see the drivers. Keep
   each layer to its own job: specs say what, the DSL gives the words,
   drivers say how each channel reaches the system.
-- Arrange a spec's starting state with `Given`, which goes through the
-  API, and keep the test DSLs for the behaviour under test. Each domain
-  has one DSL class, `<Domain>Dsl`, and specs see it only through two
-  interfaces: `I<Domain>TestDsl` (as `Todos.`) and `I<Domain>GivenDsl` (as
-  `Given.Todos.`). A method reaches a spec only if an interface lists it.
+- Arrange a spec's starting state through `Api.`, which is pinned to the
+  API, and act and check through `Sut.`, the channel under test. Each
+  domain has one DSL class, `<Domain>Dsl`, and specs see it only through
+  two interfaces: `I<Domain>SutDsl` (as `Sut.Todos`) and `I<Domain>ApiDsl`
+  (as `Api.Todos`). A method reaches a spec only if an interface lists it.
   When a spec needs to arrange something new, list a must-succeed action
-  in `I<Domain>GivenDsl`, implementing it in `<Domain>Dsl` if it isn't
+  in `I<Domain>ApiDsl`, implementing it in `<Domain>Dsl` if it isn't
   there already; never list `Attempt...` or `Confirm...` methods there.
 - Read the app code only to understand current behaviour. Never shape a
   spec around how the code happens to work.

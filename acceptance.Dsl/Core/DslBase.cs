@@ -6,13 +6,15 @@ namespace acceptance.Core.Dsl;
 // Every domain shares the spec's context, so a spec can act in one domain and
 // check the outcome from any of them.
 //
-// One DSL class serves both roles. Specs never see the class, only the
-// interfaces it implements: I<Domain>TestDsl as Todos., I<Domain>GivenDsl as
-// Given.Todos. Each domain's DSL builds itself for a role through its own
-// ForTest and ForGiven factories, and the role comes with the context: a
-// Given context records into its own last result, and turns a failed
-// must-succeed action into a GivenFailedException instead of an assertion.
-internal abstract class DslBase : ITestDsl
+// One DSL class serves every channel. Specs never see the class, only the
+// interfaces it implements: I<Domain>SutDsl as Sut.Todos, on the channel
+// under test, and I<Domain>ApiDsl as Api.Todos, pinned to the API. Each
+// domain's DSL builds itself for one of them through its own ForSut and
+// ForApi factories. A pinned channel only arranges, and that role comes
+// with the context: a context for arrangement records into its own last
+// result, and turns a failed must-succeed action into an
+// ArrangementFailedException instead of an assertion.
+internal abstract class DslBase : ISutDsl
 {
     private readonly SpecContext _context;
 
@@ -30,13 +32,13 @@ internal abstract class DslBase : ITestDsl
         if (!result.IsFailed) return;
 
         var failure = $"{because}. The system said: {result.Error}";
-        if (_context.IsGiven) throw new GivenFailedException($"A Given step failed: {failure}");
+        if (_context.IsArrangement) throw new ArrangementFailedException($"An arrangement failed: {failure}");
         Assert.Fail(failure);
     }
 
     protected T Require<T>(T? capability, string description) where T : class =>
-        capability ?? throw new InvalidOperationException(_context.IsGiven
-            ? $"This spec arranges {description} with Given, which goes through the API, " +
+        capability ?? throw new InvalidOperationException(_context.IsArrangement
+            ? $"This spec arranges {description} through Api., " +
               "and the API does not support it. Add it to the API's drivers, or arrange it another way."
             : $"This spec uses {description}, which this channel does not support. " +
               "Limit it to the channels that do, e.g. [Fact, Channels(ChannelType.Ui)].");

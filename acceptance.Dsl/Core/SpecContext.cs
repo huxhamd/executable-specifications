@@ -5,23 +5,25 @@ namespace acceptance.Core.Dsl;
 // What one spec carries across every domain's DSL: its aliases, and the
 // outcome of its last action, whichever domain that action was in.
 //
-// Given steps get a context of their own from ForGiven: the same aliases, so
-// "Buy milk" means the same todo in both roles, but a separate last result,
-// so a Given step can never change what the spec goes on to check.
+// Steps on a pinned channel (Api.) only arrange, and get a context of their
+// own from ForArrangement: the same aliases, so "Buy milk" means
+// the same todo on every channel, but a separate last result, so arranging
+// can never change what the spec goes on to check.
 internal class SpecContext
 {
-    public SpecContext() : this(new Alias(), isGiven: false) { }
+    public SpecContext() : this(new Alias(), isArrangement: false) { }
 
-    private SpecContext(Alias alias, bool isGiven)
+    private SpecContext(Alias alias, bool isArrangement)
     {
         Alias = alias;
-        IsGiven = isGiven;
+        IsArrangement = isArrangement;
     }
 
     public Alias Alias { get; }
-    public bool IsGiven { get; }
+    public bool IsArrangement { get; }
     public DriverResult? LastResult { get; set; }
 
-    // The only way to make a Given context.
-    public SpecContext ForGiven() => IsGiven ? this : new SpecContext(Alias, isGiven: true);
+    // The only way to make a context for arrangement.
+    public SpecContext ForArrangement() =>
+        IsArrangement ? this : new SpecContext(Alias, isArrangement: true);
 }
