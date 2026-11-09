@@ -7,28 +7,28 @@ public class AddingTodos : AcceptanceTestBase
     [Fact]
     public async Task UserCanAddATodo()
     {
-        await Todos.Add("Buy milk");
-        await Todos.ConfirmShown("Buy milk");
+        await Sut.Todos.Add("Buy milk");
+        await Sut.Todos.ConfirmShown("Buy milk");
     }
     
     [Fact]
     public async Task UserCannotAddATodoWithoutATitle()
     {
-        await Todos.AttemptToAdd("");
-        await Todos.ConfirmErrorIsShown("A title is required");
+        await Sut.Todos.AttemptToAdd("");
+        await Sut.Todos.ConfirmErrorIsShown("A title is required");
     }
 
     [Fact]
     public async Task UserCannotAddATodoWithATitleLongerThan255Utf16Characters()
     {
-        await Todos.AttemptToAddWithTitleOfLength(256);
-        await Todos.ConfirmErrorIsShown("The title is too long");
+        await Sut.Todos.AttemptToAddWithTitleOfLength(256);
+        await Sut.Todos.ConfirmErrorIsShown("The title is too long");
     }
 
     [Fact, Channels(ChannelType.Ui)]
     public async Task UserIsWarnedWhileTypingATitleLongerThan255Utf16Characters()
     {
-        await Todos.TypeTitleOfLength(256);
-        await Todos.ConfirmWarnedTitleIsTooLong();
+        await Sut.Todos.TypeTitleOfLength(256);
+        await Sut.Todos.ConfirmWarnedTitleIsTooLong();
     }
 }

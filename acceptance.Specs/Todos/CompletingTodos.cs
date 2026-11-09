@@ -7,9 +7,9 @@ public class CompletingTodos : AcceptanceTestBase
     [Fact]
     public async Task UserCanCompleteATodo()
     {
-        await Given.Todos.Add("Buy milk");
+        await Api.Todos.Add("Buy milk");
 
-        await Todos.Complete("Buy milk");
-        await Todos.ConfirmComplete("Buy milk");
+        await Sut.Todos.Complete("Buy milk");
+        await Sut.Todos.ConfirmComplete("Buy milk");
     }
 }
