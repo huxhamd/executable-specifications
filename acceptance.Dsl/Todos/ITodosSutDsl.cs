@@ -2,11 +2,11 @@ using acceptance.Core.Dsl;
 
 namespace acceptance.Todos.Dsl;
 
-// The todo domain's test DSL: what a spec can say about todos for the
-// behaviour under test, through the channel under test. Specs reach it as
-// Todos, so methods don't repeat the word: Todos.Add("Buy milk").
-// Its counterpart for arranging is ITodosGivenDsl. TodosDsl implements both.
-public interface ITodosTestDsl : ITestDsl
+// The todo domain's DSL on the channel under test: what a spec can say about
+// todos for the behaviour under test. Specs reach it as Sut.Todos, so methods
+// don't repeat the word: Sut.Todos.Add("Buy milk"). Its counterpart pinned
+// to the API, for arranging, is ITodosApiDsl. TodosDsl implements both.
+public interface ITodosSutDsl : ISutDsl
 {
     Task AttemptToAdd(string title);
     Task AttemptToAddWithTitleOfLength(int length);

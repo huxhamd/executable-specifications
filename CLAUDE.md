@@ -20,11 +20,12 @@
   JSON shape and the UI's `data-testid` attributes.
 - Specs describe behaviour in domain language. Every spec must pass on
   every channel unless it is marked `[Fact, Channels(...)]`.
-- Specs arrange what they need with `Given` (`Given.Todos.Add(...)`), which
-  always goes through the API, and act and check through the test DSLs
-  (`Todos.Complete(...)`), which go through the channel under test. Given
-  only arranges: it never checks, and a failure in it is reported as a
-  Given failure.
+- Specs reach the system through two roots, named for their channel.
+  `Api.` (`Api.Todos.Add(...)`) is pinned to the API on every run, and
+  `Sut.` (`Sut.Todos.Complete(...)`) is the channel under test. Specs
+  arrange what they need through `Api.` and act and check through `Sut.`.
+  A pinned channel only arranges: it never checks, and a failure in it is
+  reported as an arrangement failure.
 - Specs run in parallel against one shared, running system. A spec checks
   only what it created itself, through the DSL's aliased names, never the
   state of the whole system, such as how many todos there are in total.
