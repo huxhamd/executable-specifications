@@ -29,3 +29,6 @@
 - Specs run in parallel against one shared, running system. A spec checks
   only what it created itself, through the DSL's aliased names, never the
   state of the whole system, such as how many todos there are in total.
+- Don't add code comments unless the human asks for one. If a change makes an
+  existing comment wrong, correct it, keeping it no longer than it was.
+  Do not embellish existing comments. You may remove comments that aren't needed.
