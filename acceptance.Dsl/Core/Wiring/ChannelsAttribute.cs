@@ -3,9 +3,6 @@ using Xunit.v3;
 
 namespace acceptance.Core.Dsl;
 
-// Limits a spec to the channels it applies to: [Fact, Channels(ChannelType.Ui)].
-// Specs without it run on every channel, which should stay the default.
-// On other channels the spec is reported as skipped, never silently dropped.
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
 public sealed class ChannelsAttribute(params ChannelType[] channels) : BeforeAfterTestAttribute
 {

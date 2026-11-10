@@ -2,18 +2,6 @@ using acceptance.Core.Drivers;
 
 namespace acceptance.Core.Dsl;
 
-// The base for each business domain's DSL: Todos now, Lists or Accounts later.
-// Every domain shares the spec's context, so a spec can act in one domain and
-// check the outcome from any of them.
-//
-// One DSL class serves every channel. Specs never see the class, only the
-// interfaces it implements: I<Domain>SutDsl as Sut.Todos, on the channel
-// under test, and I<Domain>ApiDsl as Api.Todos, pinned to the API. Each
-// domain's DSL builds itself for one of them through its own ForSut and
-// ForApi factories. A pinned channel only arranges, and that role comes
-// with the context: a context for arrangement records into its own last
-// result, and turns a failed must-succeed action into an
-// ArrangementFailedException instead of an assertion.
 internal abstract class DslBase : ISutDsl
 {
     private readonly SpecContext _context;
@@ -24,7 +12,6 @@ internal abstract class DslBase : ISutDsl
 
     protected void Record(DriverResult result) => _context.LastResult = result;
 
-    // Drivers report what happened; the DSL decides whether that passes.
     protected void ConfirmLastActionSucceeded(string because)
     {
         var result = _context.LastResult

@@ -1,11 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <!--
-    The driver layer: how each channel reaches the system. Drivers and
-    channels are internal, and only the DSL may see them. Specs can't. Nor
-    can either of them see Playwright.
-  -->
-
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

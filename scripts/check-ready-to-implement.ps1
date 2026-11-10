@@ -1,5 +1,3 @@
-# Checks the starting point before the agent implements a spec:
-# the working tree is clean, and the named spec is committed.
 param([string]$Spec)
 
 # Not a mandatory parameter: PowerShell would prompt for it, which an agent can't answer.

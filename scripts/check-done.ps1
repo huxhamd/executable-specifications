@@ -6,8 +6,6 @@ function Invoke-Check([string]$name, [scriptblock]$check) {
     $results[$name] = ($LASTEXITCODE -eq 0)
 }
 
-# A check that only applies once its project exists, like the integration
-# tests, which the app agent creates with its first integration test.
 function Invoke-CheckIfPresent([string]$name, [string]$path, [scriptblock]$check) {
     if (Test-Path $path) { Invoke-Check $name $check }
     else { $results[$name] = $null }

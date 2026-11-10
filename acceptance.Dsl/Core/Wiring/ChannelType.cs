@@ -1,11 +1,9 @@
 namespace acceptance.Core.Dsl;
 
-// The channels a spec can run through. scripts/run-acceptance-tests.ps1 keeps
-// its own list of channel names: add or rename a channel in both places.
+// scripts/run-acceptance-tests.ps1 keeps its own list of channel names:
+// add or rename a channel in both places.
 public enum ChannelType { Api, Ui }
 
-// The channel this run drives the system through, from ACCEPTANCE_CHANNEL:
-// a ChannelType name, in any case.
 internal static class AcceptanceChannel
 {
     public static ChannelType Current

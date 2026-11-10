@@ -14,12 +14,8 @@ namespace acceptance.Todos.Drivers;
 //   complete-todo            control inside a todo-item that marks it complete
 //   error-message            visible when the last action was rejected
 
-// One driver for every todo capability the browser offers. UiChannel hands
-// the same instance out once per capability.
 internal class UiTodoDriver(IPage page) : ITodoDriver, ITodoEntryDriver
 {
-    // ITodoDriver
-
     public async Task<DriverResult> Add(string title)
     {
         await page.GotoAsync("/");
@@ -47,8 +43,6 @@ internal class UiTodoDriver(IPage page) : ITodoDriver, ITodoEntryDriver
         return await Eventually(LocateCompletedTodo(title));
     }
 
-    // ITodoEntryDriver
-
     // FillAsync fires an input event, which is what the title input listens to.
     public async Task TypeTitle(string title)
     {
@@ -59,9 +53,6 @@ internal class UiTodoDriver(IPage page) : ITodoDriver, ITodoEntryDriver
     public Task<bool> IsTitleTooLongWarningShown() =>
         Eventually(page.GetByTestId("title-too-long-warning"));
 
-    // Helpers
-
-    // Whether the locator becomes visible within the page's default timeout.
     // Waits for a yes, so a no takes the full timeout: to check that something
     // is absent, wait for it to be hidden instead of negating this.
     private static async Task<bool> Eventually(ILocator locator)
@@ -71,7 +62,6 @@ internal class UiTodoDriver(IPage page) : ITodoDriver, ITodoEntryDriver
         return !result.IsFailed;
     }
 
-    // Exact match title, so "" only matches a todo whose title is really blank.
     private ILocator LocateTodo(string title) =>
         page.GetByTestId("todo-item").Filter(new()
         {
@@ -86,7 +76,6 @@ internal class UiTodoDriver(IPage page) : ITodoDriver, ITodoEntryDriver
     private ILocator LocateCompletedTodo(string title) =>
         LocateTodo(title).And(page.Locator("[data-completed='true']"));
 
-    // Wait for either the expected change, or the error.
     private async Task<DriverResult> Outcome(ILocator success)
     {
         var error = page.GetByTestId("error-message");

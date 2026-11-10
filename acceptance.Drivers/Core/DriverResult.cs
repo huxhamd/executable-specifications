@@ -6,8 +6,6 @@ internal record DriverResult(bool IsFailed, string Error = "")
     public static DriverResult Fail(string error) =>
         new(true, error);
 
-    // Operations with no result
-
     public static Task<DriverResult> TryCatchAsync(
         Func<Task> operation,
         string? error = null)
@@ -24,8 +22,6 @@ internal record DriverResult(bool IsFailed, string Error = "")
         Func<Task> operation,
         Func<Exception, string?> mapException)
         => TryCatchAsync(async () => { await operation(); return Okay; }, mapException);
-
-    // Operations that already produce a DriverResult
 
     public static Task<DriverResult> TryCatchAsync(
         Func<Task<DriverResult>> operation,
