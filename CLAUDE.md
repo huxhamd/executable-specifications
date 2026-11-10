@@ -24,8 +24,9 @@
   `Api.` (`Api.Todos.Add(...)`) is pinned to the API on every run, and
   `Sut.` (`Sut.Todos.Complete(...)`) is the channel under test. Specs
   arrange what they need through `Api.` and act and check through `Sut.`.
-  A pinned channel only arranges: it never checks, and a failure in it is
-  reported as an arrangement failure.
+  Check through a pinned channel only an outcome that users of the channel
+  under test don't see. A failed action on a pinned channel is reported as
+  an arrangement failure.
 - Specs run in parallel against one shared, running system. A spec checks
   only what it created itself, through the DSL's aliased names, never the
   state of the whole system, such as how many todos there are in total.

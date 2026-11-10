@@ -19,14 +19,15 @@ internal abstract class DslBase : ISutDsl
         if (!result.IsFailed) return;
 
         var failure = $"{because}. The system said: {result.Error}";
-        if (_context.IsArrangement) throw new ArrangementFailedException($"An arrangement failed: {failure}");
+        if (_context.IsPinnedChannel)
+            throw new ArrangementFailedException($"An arrangement through {_context.PinnedChannel}. failed: {failure}");
         Assert.Fail(failure);
     }
 
     protected T Require<T>(T? capability, string description) where T : class =>
-        capability ?? throw new InvalidOperationException(_context.IsArrangement
-            ? $"This spec arranges {description} through Api., " +
-              "and the API does not support it. Add it to the API's drivers, or arrange it another way."
+        capability ?? throw new InvalidOperationException(_context.IsPinnedChannel
+            ? $"This spec uses {description} through {_context.PinnedChannel}., which does not support it. " +
+              "Add it to that channel's drivers, or reach it another way."
             : $"This spec uses {description}, which this channel does not support. " +
               "Limit it to the channels that do, e.g. [Fact, Channels(ChannelType.Ui)].");
 

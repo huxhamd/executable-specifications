@@ -4,18 +4,19 @@ namespace acceptance.Core.Dsl;
 
 internal class SpecContext
 {
-    public SpecContext() : this(new Alias(), isArrangement: false) { }
+    public SpecContext() : this(new Alias(), pinnedChannel: null) { }
 
-    private SpecContext(Alias alias, bool isArrangement)
+    private SpecContext(Alias alias, string? pinnedChannel)
     {
         Alias = alias;
-        IsArrangement = isArrangement;
+        PinnedChannel = pinnedChannel;
     }
 
     public Alias Alias { get; }
-    public bool IsArrangement { get; }
+    public string? PinnedChannel { get; }
+    public bool IsPinnedChannel => PinnedChannel is not null;
     public DriverResult? LastResult { get; set; }
 
-    public SpecContext ForArrangement() =>
-        IsArrangement ? this : new SpecContext(Alias, isArrangement: true);
+    public SpecContext ForPinnedChannel(string channel) =>
+        new(Alias, channel);
 }
