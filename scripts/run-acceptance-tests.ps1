@@ -1,14 +1,8 @@
-# Deploys the system in fresh containers and runs every spec through each channel,
-# or through one: -Channel ui.
-
 # Not mandatory: PowerShell would prompt for it, which an agent can't answer.
 param([string]$Channel)
 
-# The channels, by name, and how many specs run at once on each: xUnit's
-# MaxParallelThreads, as a number or a multiple of this machine's CPU threads
-# such as "2x". API specs mostly wait on the network, so they can run wide;
-# each UI spec drives a page in a real browser, so keep that lower. Tune
-# these for your machine or CI agent.
+# API specs mostly wait on the network, so they can run wide; each UI spec
+# drives a page in a real browser, so keep that lower.
 # acceptance.Dsl/Core/Wiring/ChannelType.cs keeps its own list of channels
 # (the ChannelType enum): add or rename a channel in both places.
 $parallelSpecs = [ordered]@{
@@ -17,7 +11,6 @@ $parallelSpecs = [ordered]@{
 }
 $allChannels = @($parallelSpecs.Keys)
 
-# Checked before deploying, so a mistyped channel fails at once.
 $channels = $allChannels
 if ($Channel -and $Channel.Trim()) {
     $channels = @($Channel.Trim().ToLowerInvariant())
@@ -28,7 +21,6 @@ if ($Channel -and $Channel.Trim()) {
     }
 }
 
-# Docker must be running first. If it isn't, try to start Docker Desktop and wait for it.
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     [Console]::Error.WriteLine("Docker isn't installed, or isn't on the PATH.")
     exit 1
@@ -42,7 +34,6 @@ function Test-DockerRunning {
 if (-not (Test-DockerRunning)) {
     $waitSeconds = 60
     Write-Host "Docker isn't running. Starting Docker Desktop (waiting up to $waitSeconds seconds)..."
-    # --detach returns at once; Docker is ready only when `docker info` succeeds.
     docker desktop start --detach *> $null
     if ($LASTEXITCODE -ne 0) {
         # No Docker Desktop CLI: an older Docker Desktop, or Docker Engine without Desktop.
