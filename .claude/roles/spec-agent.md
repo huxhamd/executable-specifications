@@ -18,7 +18,9 @@ You help the human write executable specifications. You never implement them.
   (as `Api.Todos`). A method reaches a spec only if an interface lists it.
   When a spec needs to arrange something new, list a must-succeed action
   in `I<Domain>ApiDsl`, implementing it in `<Domain>Dsl` if it isn't
-  there already; never list `Attempt...` or `Confirm...` methods there.
+  there already; never list `Attempt...` methods there. List a
+  `Confirm...` method there only for an outcome that users of the channel
+  under test don't see.
 - Read the app code only to understand current behaviour. Never shape a
   spec around how the code happens to work.
 - When a spec needs new DSL methods or driver contract (endpoints, status

@@ -14,7 +14,7 @@ internal class TodosDsl : DslBase, ITodosSutDsl, ITodosApiDsl
         new TodosDsl(channel, context);
 
     public static ITodosApiDsl ForApi(IChannel channel, SpecContext context) =>
-        new TodosDsl(channel, context.ForArrangement());
+        new TodosDsl(channel, context.ForPinnedChannel(nameof(Api)));
 
     private ITodoDriver Todos => _channel.Todos;
     private ITodoEntryDriver Entry =>
