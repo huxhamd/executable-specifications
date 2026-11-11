@@ -21,6 +21,14 @@ if ($Channel -and $Channel.Trim()) {
     }
 }
 
+$hasSpecs = Get-ChildItem acceptance.Specs -Recurse -Filter *.cs |
+    Where-Object { $_.FullName -notmatch '[\\/](Core|bin|obj)[\\/]' } |
+    Select-String -Pattern '\[(Fact|Theory)\b' -Quiet
+if (-not $hasSpecs) {
+    Write-Host "No specs in acceptance.Specs yet, so there is nothing to run." -ForegroundColor Yellow
+    exit 0
+}
+
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     [Console]::Error.WriteLine("Docker isn't installed, or isn't on the PATH.")
     exit 1
@@ -61,7 +69,7 @@ $failed = @()
 foreach ($name in $channels) {
     Write-Host "`n=== Acceptance tests: $name ===`n"
     $env:ACCEPTANCE_CHANNEL = $name
-    dotnet test acceptance.Specs -- "xUnit.MaxParallelThreads=$($parallelSpecs[$name])"
+    dotnet test acceptance.Specs -- "xUnit.MaxParallelThreads=$($parallelSpecs[$name])" RunConfiguration.TreatNoTestsAsError=true
     if ($LASTEXITCODE -ne 0) { $failed += $name }
 }
 Remove-Item Env:ACCEPTANCE_CHANNEL
