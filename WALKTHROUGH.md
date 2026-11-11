@@ -1066,12 +1066,19 @@ The working agreement every session shares, whatever its role. Claude Code reads
 
 **`.claude/roles.json`**
 
-The ownership table: the single source of truth for who may change what. A folder entry ends in `/`. When entries overlap, the most specific wins, which is how `api/Dockerfile` belongs to the harness agent while the rest of `api/` belongs to the app agent. A path in no entry belongs to nobody, so only a free agent can change it; `set-role.ps1` refuses to run if two roles claim the same entry. `worksOnTemplate` says whether an agent's work belongs on the `template` branch; the session start warns when a worktree's branch doesn't match.
+The ownership table: the single source of truth for who may change what. A folder entry ends in `/`. When entries overlap, the most specific wins, which is how `api/Dockerfile` belongs to the harness agent while the rest of `api/` belongs to the app agent. A path in no entry belongs to nobody, so only a free agent can change it, and `unowned` lists the paths left that way on purpose; `set-role.ps1` refuses to run if two roles claim the same entry. `worksOnTemplate` says whether an agent's work belongs on the `template` branch; the session start warns when a worktree's branch doesn't match.
 
 ```json
 {
   "templateBranch": "template",
   "//": "worksOnTemplate: true = this agent's work belongs on the template branch; false = it doesn't; absent = either. The session start warns on a mismatch.",
+  "//unowned": "Paths no role owns: only the human and unrestricted roles, such as the free-agent, edit them.",
+  "unowned": [
+    "GAPANALYSIS.md",
+    "NOTES.md",
+    "OBSERVATIONS.md",
+    "TODO.md"
+  ],
   "roles": {
     "spec-agent": {
       "summary": "Helps the human write executable specifications. Never implements.",
@@ -1106,7 +1113,7 @@ The ownership table: the single source of truth for who may change what. A folde
         "scripts/",
         "CLAUDE.md",
         "README.md",
-        "Executable Specs with an AI Agent ToDo App Walkthrough.md",
+        "WALKTHROUGH.md",
         ".editorconfig",
         ".gitattributes",
         ".gitignore",
@@ -1272,8 +1279,9 @@ guide. You don't write specs or app code.
   cases, and say what you couldn't test.
 - The guide shows some files in full. When you change one of them,
   update the guide to match.
-- Every path should belong to exactly one role. When you add a file or
-  folder, add it to `.claude/roles.json`.
+- Every path should belong to exactly one role, or be listed under
+  `unowned` in `.claude/roles.json`. When you add a file or folder, add
+  it to one or the other.
 - When you add or rename a role, add or rename its command in
   `.claude/commands/` and its instructions in `.claude/roles/`.
 ```
