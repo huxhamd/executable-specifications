@@ -1,14 +1,28 @@
 # TODO
 
-* When there are no specs (like in `template`), all the tests pass with a warning - probably wrong.
-
 * In other sessions the agents have referred to Farley using some kind of named parameters in the spec.
 
 * What are Farley's stubs for interacting with external apps / systems?
 
-* Open source library?
+* Approach for "ensureEntryDoesNotExist", to compliment the existing "ensureEntryExists" scenario. (Gap analysis point 1)
 
-* How to handle user types?
+* Alias override technique. (Gap analysis point 2)
+
+* Error messages that echo a value. (Gap analysis point 3)
+
+* Waiting on the API side. (Gap analysis point 4)
+
+* Duplicate identical entries. (Gap analysis point 5)
+
+* How to handle user types? (Gap analysis point 6)
+
+* Time machine for anything date based. (Gap analysis point 7)
+
+* Custom annotation for specs that are written but not implemented yet. (Gap analysis point 8)
+
+* ✅ Open source library?
+
+* ✅ When there are no specs (like in `template`), all the tests pass with a warning - probably wrong.
 
 * Update template branch
  - ✅ Spec wording (guide only)
