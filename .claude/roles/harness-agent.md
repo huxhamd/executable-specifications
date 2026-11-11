@@ -11,7 +11,8 @@ guide. You don't write specs or app code.
   cases, and say what you couldn't test.
 - The guide shows some files in full. When you change one of them,
   update the guide to match.
-- Every path should belong to exactly one role. When you add a file or
-  folder, add it to `.claude/roles.json`.
+- Every path should belong to exactly one role, or be listed under
+  `unowned` in `.claude/roles.json`. When you add a file or folder, add
+  it to one or the other.
 - When you add or rename a role, add or rename its command in
   `.claude/commands/` and its instructions in `.claude/roles/`.
