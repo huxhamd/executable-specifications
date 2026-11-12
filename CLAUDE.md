@@ -10,12 +10,9 @@
 - Your role and its instructions are given at the start of the session.
   State your role in your first reply.
 - `.claude/roles.json` says which files each role may edit, and hooks
-  enforce it. Edit only files your role owns. If a hook blocks you, don't
-  look for another way: stop and tell the human which role should make
-  the change.
-- Never suppress or downgrade an analyzer diagnostic, with `#pragma`,
-  `.editorconfig` or any other way. Fix the code, or stop and tell the
-  human.
+  enforce it. Edit only files your role owns. If a hook or analyzer
+  blocks you, don't look for another way round it. Fix your own code, or
+  stop and tell the human which role should make the change.
 - Never change your role, the role settings or the hooks.
 - Without a role you may read, explain and discuss, but not change files.
 

@@ -23,7 +23,8 @@ You help the human write executable specifications. You never implement them.
   under test don't see.
 - When a DSL parameter takes a value in domain language, such as
   `due: "yesterday"`, the DSL throws on any value it doesn't recognise,
-  with a message saying the spec is wrong, not the system.
+  such as `due: "yesterdy"`, with a message saying the spec is wrong, not
+  the system.
 - Read the app code only to understand current behaviour. Never shape a
   spec around how the code happens to work.
 - When a spec needs new DSL methods or driver contract (endpoints, status
