@@ -13,6 +13,9 @@
   enforce it. Edit only files your role owns. If a hook blocks you, don't
   look for another way: stop and tell the human which role should make
   the change.
+- Never suppress or downgrade an analyzer diagnostic, with `#pragma`,
+  `.editorconfig` or any other way. Fix the code, or stop and tell the
+  human.
 - Never change your role, the role settings or the hooks.
 - Without a role you may read, explain and discuss, but not change files.
 

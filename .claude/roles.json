@@ -39,6 +39,7 @@
         "acceptance.Specs/Todo.Acceptance.Specs.csproj",
         "acceptance.Dsl/Todo.Acceptance.Dsl.csproj",
         "acceptance.Drivers/Todo.Acceptance.Drivers.csproj",
+        "acceptance.Analyzers/",
         ".claude/",
         "scripts/",
         "CLAUDE.md",

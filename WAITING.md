@@ -9,8 +9,8 @@ Nothing here is implemented yet; `TODO.md` tracks the work.
 A spec acts and then checks:
 
 ``` csharp
-await Sut.Todos.Add("Buy milk");
-await Sut.Todos.ConfirmShown("Buy milk");
+await Sut.Todos.Add(title: "Buy milk");
+await Sut.Todos.ConfirmShown(title: "Buy milk");
 ```
 
 Checking once is only safe if the system guarantees that, once it has

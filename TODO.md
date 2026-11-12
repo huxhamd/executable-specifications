@@ -17,7 +17,15 @@
 
 * Custom annotation for specs that are written but not implemented yet. (Gap analysis point 8)
 
+* Example of adding a DSL parameter without breaking existing specs, e.g. a due date set by a new spec while the existing specs stay untouched. (Leads into gap analysis point 7)
+
+* Decide whether to rename DSL methods whose names repeat their argument, e.g. `AttemptToAddWithTitleOfLength(length: 256)` to `AttemptToAdd(titleLength: 256)`.
+
+* Bring WALKTHROUGH.md back in step: its copies of CLAUDE.md, `.claude/roles.json` and `.claude/roles/spec-agent.md` were already out of date before the analyzer, its spec examples pass DSL arguments positionally, and it has no section on the analyzer.
+
 * ✅ In other sessions the agents have referred to Farley using some kind of named parameters in the spec. (See GAPANALYSIS.md)
+
+* ✅ Specs pass every DSL argument by name, and DSL defaults live on the interfaces, both enforced by an analyzer. (See GAPANALYSIS.md)
 
 * ✅ What are Farley's stubs for interacting with external apps / systems? (Merged into gap analysis point 7)
 

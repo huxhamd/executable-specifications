@@ -130,3 +130,20 @@ Working through it settled four design points, written up in `WAITING.md`:
 - A long or scheduled delay is not waited for. The spec triggers it through the harness, which makes it part of point 7.
 
 The proposed example is bulk import, returning 202 Accepted and processing the todos in the background. `TODO.md` lists the work.
+
+
+## Revisiting named parameters: checking calls (12 November 2026)
+
+Two things Farley's `"name: value"` parameters do weren't covered above. The DSL rejects a call with an unknown parameter, too many values or a required one missing, so a spec it can't interpret fails loudly instead of being guessed at. And adding a parameter doesn't break the specs that already exist.
+
+In C#, the compiler covers most of the first point, and does it before anything runs. An unknown argument name, too many arguments or a missing required one won't compile. Optional parameters with defaults cover the second point. That leaves three holes, each now closed:
+
+- **Values.** The compiler can't tell that `due: "yesterdy"` is a typo. The DSL throws on any domain-language value it doesn't recognise, and says the spec is wrong, not the system. This is a rule in `.claude/roles/spec-agent.md`, because only the spec-agent writes DSL methods.
+- **Positional arguments.** If a parameter is inserted into a DSL method, an existing positional call can bind a value to the wrong parameter. The spec still compiles and quietly changes meaning. So specs pass every DSL argument by name. A rule that applies only to optional arguments would make each unnamed argument a question for the reader, while a rule with no exceptions makes every unnamed argument a mistake, visible at a glance. It also means new parameters can go anywhere, not just at the end.
+- **Defaults on the class.** C# takes a default from the type a call goes through. Specs call through the DSL interfaces, so a default declared only on the class is ignored by specs.
+
+The last two are checked by an analyzer in `acceptance.Analyzers`, which both `acceptance.Specs` and `acceptance.Dsl` use. ACC001 reports an unnamed argument in a call from another project into a DSL namespace, which is how specs reach the DSL. The DSL's calls to itself are harness code and aren't checked. ACC002 reports a default on a DSL class method that implements a DSL interface. Both are errors, and both are marked as not configurable, so `#pragma` and `.editorconfig` can't turn them off. That was tested against the compiler.
+
+Because the analyzer enforces these rules and its messages explain them, `CLAUDE.md` doesn't repeat them. `CLAUDE.md` holds only what can't be checked mechanically. It gains one general rule: never suppress or downgrade an analyzer diagnostic. That covers analyzers added later that may not be marked the same way.
+
+The analyzer references `Microsoft.CodeAnalysis.CSharp` 4.14.0. An analyzer can't use a newer Roslyn than the compiler that loads it, and the .NET 10 SDK's compiler is newer than that.
