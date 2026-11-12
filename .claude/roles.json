@@ -6,7 +6,8 @@
     "GAPANALYSIS.md",
     "NOTES.md",
     "OBSERVATIONS.md",
-    "TODO.md"
+    "TODO.md",
+    "WAITING.md"
   ],
   "roles": {
     "spec-agent": {

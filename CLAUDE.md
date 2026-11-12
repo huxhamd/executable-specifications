@@ -29,12 +29,20 @@
   Check through a pinned channel only an outcome that users of the channel
   under test don't see. A failed action on a pinned channel is reported as
   an arrangement failure.
-- Work out designs for specs, the DSL and the harness from the principles
-  of Farley's approach. Treat LMAX's Simple-DSL and Farley's sample code
-  as reference only, and say when you draw on them.
+- Work out designs from the principles of Farley's approach, not from
+  existing implementations such as LMAX's Simple-DSL or Farley's sample
+  code. Use those only as reference, say so when you draw on them.
 - Specs run in parallel against one shared, running system. A spec checks
   only what it created itself, through the DSL's aliased names, never the
   state of the whole system, such as how many todos there are in total.
+- Waiting for the system belongs to the drivers. Specs and the DSL never
+  mention timing: no delays, retries or timeouts. Drivers wait only on
+  observations, never repeat a command, and never wait through a retry
+  policy that also applies to commands. Every channel uses the same timeout.
+  The UI waits through Playwright; other channels use the shared polling
+  helper in `acceptance.Drivers/Core`, not a loop of their own. A long or
+  scheduled delay is not waited for: the spec triggers it through the
+  harness. `WAITING.md` has the reasoning.
 - Don't add code comments unless the human asks for one. If a change makes an
   existing comment wrong, correct it, keeping it no longer than it was.
   Do not embellish existing comments. You may remove comments that aren't needed.
