@@ -61,3 +61,57 @@ Sources:
 [Simple-DSL wiki: Layers](https://github.com/LMAX-Exchange/Simple-DSL/wiki/Layers)
 [davef77/acceptance-testing](https://github.com/davef77/acceptance-testing)
 [Dave Farley on the Continuous Delivery Google group](https://groups.google.com/g/continuousdelivery/c/ajrKzJU5DgA)
+
+## Does Farley's named-parameter style matter in C#?
+
+Mechanically, the `"name: value"` strings make up for Java having no named or optional parameters. But the style carries reasons that are about test design, not syntax:
+
+- A spec states only what is essential to its behaviour. Everything else gets a default in the DSL.
+- Specs speak in strings in the language of the domain and never use the system's own types. That keeps the specs decoupled from the system.
+- Aliasing happens in the DSL, so specs are isolated from each other without saying so.
+- New optional parameters with defaults don't break existing specs.
+
+All of these hold in this project without strings:
+
+- **Decoupling** is enforced by the project references. `acceptance.Specs` references only `acceptance.Dsl`, the drivers are `internal`, and nothing in the harness references `Todo.Api`.
+- **Isolation** comes from `Alias`, applied in `TodosDsl` and shared between `Sut.` and `Api.` through `SpecContext`. Each DSL method has to remember to apply it. A method that forgets still passes until two parallel runs collide, so new DSL methods need checking for this.
+- **Defaults** aren't needed yet, because a todo has only a title. When it gains more, use optional parameters with named arguments at the call site, such as `Add("Pay rent", due: "yesterday")`. Declare the defaults on the DSL interfaces, such as `ITodosSutDsl`. Specs call through the interfaces, and C# ignores defaults declared only on the class. Keep the parameters in domain language, such as `due: "yesterday"` rather than a `DateTime`, so the DSL does the translating.
+
+So the style doesn't need copying. Its reasons are already in the design.
+
+
+## Revisiting the gaps (11 November 2026)
+
+Two things have changed since the answers above. This section redefines the open points rather than editing them, so the history stays.
+
+**What counts as a gap.** A gap is a common scenario the harness can't express because the design hasn't considered it. A scenario the harness handles differently from LMAX or Farley's sample is not a gap.
+
+**Where solutions come from.** Solutions are worked out from the principles of Farley's approach, not borrowed from existing implementations. Simple-DSL and Farley's sample are reference material only. `CLAUDE.md` now says to work this way. Two recommendations above were borrowed from LMAX and are withdrawn: the angle-bracket escape in point 2 and the message placeholders in point 3.
+
+### Closed: not gaps
+
+**2. Specs can't control the exact text the system sees.** Turning aliasing off for a value, as LMAX's angle brackets do, breaks isolation: two parallel runs of a trimming spec would both add `"  Buy milk  "`. It also puts a harness mechanism into the spec. Instead, the spec names the behaviour that matters, and the DSL builds a value that shows it while staying aliased. A trimming spec would say `AddWithSurroundingSpaces("Buy milk")`, and the DSL would send `"  Buy milk_abc123  "`. `AttemptToAddWithTitleOfLength` already follows this pattern, so it serves as the example.
+
+**4. Waiting on the API side.** The API keeps todos in memory and answers synchronously, so a read straight after a write always sees it. Waiting would only matter if the system became eventually consistent, and that change would stay inside `ApiTodoDriver`.
+
+**5. A todo's title is also its identity.** Whether two todos can share a title is a product decision, not a harness one. If they can, the spec says how a user tells them apart, such as "the second 'Buy milk'", and a DSL method expresses that. Both todos carry the same alias, so isolation still holds.
+
+### Not a design gap, but needs an example
+
+**3. Error messages that echo a value.** Placeholders in the expected message put a mechanism into the spec, and the user never sees `<title>`. The spec should state the message as the user reads it:
+
+``` csharp
+await Sut.Todos.ConfirmErrorIsShown("'Buy milk' is already complete");
+```
+
+The DSL translates in the other direction: `ConfirmErrorIsShown` removes this spec's alias suffix from the system's message before comparing. Nothing in the design prevents this, but no current spec shows it. Because the project is a store of examples, the next step is a spec that needs it, such as completing a todo that's already complete. This stays open in `TODO.md` until that spec exists.
+
+### Still open: real gaps
+
+**1. Confirming that something is absent.** No spec can yet say correctly that a todo is no longer shown. Negating `ConfirmShown` waits the full timeout when the todo is gone, and can pass too early while the page is loading. The driver contract needs its own "wait until gone" query, with a `ConfirmNotShown` in the DSL. The example spec would be deleting a todo.
+
+**6. More than one actor.** The harness has no notion of who is acting. `Sut.`'s browser is a single anonymous session, and `Api.` arranges with no identity. Once there are users, the acting user belongs in `SpecContext`, and `Api.` must arrange as the same user `Sut.` is signed in as. Some specs, such as "Alice can't see Bob's todos", also need two actors on the channel under test. This changes `SpecContext` and the channels, not just the DSL.
+
+**7. Controlling the system's boundaries.** Redefined to include the `TODO.md` question about stubs for external systems. Farley's principle is that a spec controls everything at the system's boundaries, so its outcome depends only on what it says. The clock is one such boundary, and any external system the app calls is another. The harness can reach the system only through its UI and API, and has no way to control what the system depends on. Nothing breaks yet, because the app has no such dependencies. This needs designing before the first due date or external call.
+
+**8. Specs written before they are implemented.** A process gap only. With one spec in flight, the current flow works. It matters if several specs are queued at once, or parallel worktrees run on `practice`. The question above still stands: is that a case you expect to hit?
