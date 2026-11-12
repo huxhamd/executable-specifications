@@ -1,24 +1,24 @@
 # TODO
 
-* In other sessions the agents have referred to Farley using some kind of named parameters in the spec.
+* Confirming that something is absent, e.g. `ConfirmNotShown`, with an example spec such as deleting a todo. (Gap analysis point 1)
 
-* What are Farley's stubs for interacting with external apps / systems?
+* Example spec for an error message that echoes a value, e.g. completing a todo that's already complete, with `ConfirmErrorIsShown` removing the alias. (Gap analysis point 3)
 
-* Approach for "ensureEntryDoesNotExist", to compliment the existing "ensureEntryExists" scenario. (Gap analysis point 1)
+* More than one actor: who is acting, and specs with two users. (Gap analysis point 6)
 
-* Alias override technique. (Gap analysis point 2)
-
-* Error messages that echo a value. (Gap analysis point 3)
-
-* Waiting on the API side. (Gap analysis point 4)
-
-* Duplicate identical entries. (Gap analysis point 5)
-
-* How to handle user types? (Gap analysis point 6)
-
-* Time machine for anything date based. (Gap analysis point 7)
+* Controlling the system's boundaries: the clock and stubs for external systems. (Gap analysis point 7)
 
 * Custom annotation for specs that are written but not implemented yet. (Gap analysis point 8)
+
+* ✅ In other sessions the agents have referred to Farley using some kind of named parameters in the spec. (See GAPANALYSIS.md)
+
+* ✅ What are Farley's stubs for interacting with external apps / systems? (Merged into gap analysis point 7)
+
+* ✅ Alias override technique. (Gap analysis point 2: not a gap)
+
+* ✅ Waiting on the API side. (Gap analysis point 4: not a gap)
+
+* ✅ Duplicate identical entries. (Gap analysis point 5: not a gap)
 
 * ✅ Open source library?
 

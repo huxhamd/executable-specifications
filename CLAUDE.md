@@ -1,3 +1,5 @@
+@README.md
+
 # Working agreement
 
 ## Roles
@@ -27,6 +29,9 @@
   Check through a pinned channel only an outcome that users of the channel
   under test don't see. A failed action on a pinned channel is reported as
   an arrangement failure.
+- Work out designs for specs, the DSL and the harness from the principles
+  of Farley's approach. Treat LMAX's Simple-DSL and Farley's sample code
+  as reference only, and say when you draw on them.
 - Specs run in parallel against one shared, running system. A spec checks
   only what it created itself, through the DSL's aliased names, never the
   state of the whole system, such as how many todos there are in total.
