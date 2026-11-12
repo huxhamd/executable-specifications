@@ -4,6 +4,13 @@
 
 * Example spec for an error message that echoes a value, e.g. completing a todo that's already complete, with `ConfirmErrorIsShown` removing the alias. (Gap analysis point 3)
 
+* Example of waiting for an eventually consistent outcome. (Gap analysis point 4, reopened; see WAITING.md)
+ - Bulk import feature returning 202 Accepted, with a spec that imported todos are shown
+ - Shared polling helper in `acceptance.Drivers/Core`, used by `ApiTodoDriver` queries
+ - One channel-neutral timeout, replacing `ACCEPTANCE_UI_TIMEOUT_SECONDS`, passed to every channel
+ - Decide whether the UI driver reloads or the page updates by itself, and record why
+ - Walkthrough section that uses the example
+
 * More than one actor: who is acting, and specs with two users. (Gap analysis point 6)
 
 * Controlling the system's boundaries: the clock and stubs for external systems. (Gap analysis point 7)
@@ -15,8 +22,6 @@
 * ✅ What are Farley's stubs for interacting with external apps / systems? (Merged into gap analysis point 7)
 
 * ✅ Alias override technique. (Gap analysis point 2: not a gap)
-
-* ✅ Waiting on the API side. (Gap analysis point 4: not a gap)
 
 * ✅ Duplicate identical entries. (Gap analysis point 5: not a gap)
 

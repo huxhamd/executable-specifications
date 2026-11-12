@@ -115,3 +115,18 @@ The DSL translates in the other direction: `ConfirmErrorIsShown` removes this sp
 **7. Controlling the system's boundaries.** Redefined to include the `TODO.md` question about stubs for external systems. Farley's principle is that a spec controls everything at the system's boundaries, so its outcome depends only on what it says. The clock is one such boundary, and any external system the app calls is another. The harness can reach the system only through its UI and API, and has no way to control what the system depends on. Nothing breaks yet, because the app has no such dependencies. This needs designing before the first due date or external call.
 
 **8. Specs written before they are implemented.** A process gap only. With one spec in flight, the current flow works. It matters if several specs are queued at once, or parallel worktrees run on `practice`. The question above still stands: is that a case you expect to hit?
+
+## Revisiting point 4: waiting (12 November 2026)
+
+**4. Waiting on the API side: reopened as "needs an example".** Point 4 was closed above because the API keeps todos in memory. That was the weaker half of the reason. What matters is that the API answers synchronously: a write is committed before the response goes back, so a read straight after it sees the change. Adding a database keeps that true. A system needs waiting when it accepts a change and makes it visible later, through a queue, a background worker, a read replica, a cache or a projection.
+
+The design already handles this. `ITodoDriver` says its queries wait for a yes before answering no, the UI driver does so through Playwright, and polling in `ApiTodoDriver` would change no spec or DSL code. So this is not a design gap. But the project has no example of it, and the project is a store of examples, so it moves alongside point 3.
+
+Working through it settled four design points, written up in `WAITING.md`:
+
+- Drivers wait only on observations, never on commands, so a retry can't do something twice.
+- Channels with no waiting of their own use one shared polling helper in `acceptance.Drivers/Core`, not a loop in each method. The UI keeps Playwright's waiting.
+- Every channel uses the same timeout. Today's `ACCEPTANCE_UI_TIMEOUT_SECONDS` becomes channel-neutral.
+- A long or scheduled delay is not waited for. The spec triggers it through the harness, which makes it part of point 7.
+
+The proposed example is bulk import, returning 202 Accepted and processing the todos in the background. `TODO.md` lists the work.
