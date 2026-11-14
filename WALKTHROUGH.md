@@ -6,7 +6,7 @@ Oct 22, 2026, updated Nov 14, 2026 · @Daniel Huxham
 
 You'll build a tiny ToDo app (Angular front end, C# REST API) where you never write the app code yourself. You write executable specifications, lock them, and let Claude Code make them pass. Plan on two or three evenings.
 
-By the end you'll have practised the full loop four times, including one unhappy path, and you'll have proved the payoff: swapping the storage layer without touching a single spec.
+By the end you'll have practised the full loop five times, including one unhappy path, and you'll have proved the payoff: swapping the storage layer without touching a single spec.
 
 **Who owns what**
 
@@ -17,7 +17,7 @@ You own everything and review everything. The agent works in one of three roles 
 | `acceptance.Specs/<Domain>` | The executable specifications | Spec agent |
 | `acceptance.Dsl/<Domain>` | The domain vocabulary the specs speak | Spec agent |
 | `acceptance.Drivers/<Domain>` | The contract: API routes and JSON, UI test IDs, and how each channel provides them | Spec agent |
-| `acceptance.Dsl/Core`, `acceptance.Drivers/Core` | What every domain's DSL and drivers share | Spec agent |
+| `acceptance.Dsl/Core`, `acceptance.Drivers/Core`, `acceptance.Dsl.UnitTests/` | What every domain's DSL and drivers share, and the DSL's unit tests | Spec agent |
 | `api/`, `api.UnitTests/`, `api.IntegrationTests/`, `web/` | The app and its unit and integration tests | App agent |
 | Each project's `Core/Wiring`, the acceptance project files, `acceptance.Analyzers/`, `scripts/`, `.claude/`, `CLAUDE.md`, deployment files, this guide | The harness, guardrails and deployable system | Harness agent |
 
@@ -77,6 +77,15 @@ dotnet add package xunit.runner.visualstudio
 dotnet add reference ../acceptance.Dsl/Todo.Acceptance.Dsl.csproj
 cd ..
 
+# ...the DSL's own unit tests, for what the specs never exercise...
+dotnet new xunit -n Todo.Acceptance.Dsl.UnitTests -o acceptance.Dsl.UnitTests
+cd acceptance.Dsl.UnitTests
+dotnet remove package xunit
+dotnet add package xunit.v3.mtp-off
+dotnet add package xunit.runner.visualstudio
+dotnet add reference ../acceptance.Dsl/Todo.Acceptance.Dsl.csproj
+cd ..
+
 # Last, an analyzer that checks how specs call the DSL. Analyzers
 # target netstandard2.0, because the compiler loads them.
 dotnet new classlib -n Todo.Acceptance.Analyzers -o acceptance.Analyzers -f netstandard2.0
@@ -87,10 +96,11 @@ cd ..
 
 Each layer gets its own project, so the compiler enforces the layering. A few project-file edits finish the job:
 
-- **The drivers' types are `internal`, and only the DSL may see them.** Add `<ItemGroup><InternalsVisibleTo Include="Todo.Acceptance.Dsl" /></ItemGroup>` to `acceptance.Drivers/Todo.Acceptance.Drivers.csproj`.
+- **The drivers' types are `internal`, and only the DSL and its unit tests may see them.** Add `<ItemGroup><InternalsVisibleTo Include="Todo.Acceptance.Dsl" /><InternalsVisibleTo Include="Todo.Acceptance.Dsl.UnitTests" /></ItemGroup>` to `acceptance.Drivers/Todo.Acceptance.Drivers.csproj`.
 - **Only the drivers compile against Playwright.** In the same file, add `PrivateAssets="compile;contentfiles;analyzers;build"` to the `Microsoft.Playwright` package reference. That's NuGet's default plus `compile`: the specs still get Playwright and its browser driver at runtime.
 - **The DSL gives verdicts but holds no tests**, so it uses xUnit's extensibility and assertion packages rather than the test runner. Add `<ItemGroup><Using Include="Xunit" /></ItemGroup>` to its project file, as the specs' already has. The drivers have no xUnit at all, so they can't assert.
 - **The specs need xUnit v3 4.x.** The `xunit` template still uses xUnit v2. The plumbing needs v3 for the `Channels` attribute's runtime skipping, and 4.0 or later for running specs in the same class in parallel, which is why the package is swapped. `xunit.v3.mtp-off` is v3 for VSTest, which is what `dotnet test` uses unless you opt in to Microsoft Testing Platform; plain `xunit.v3` 4.x only works with the latter. Keep every xUnit package, in the DSL as well as the specs, on the same version. v3 test projects are executables, so add `<OutputType>Exe</OutputType>` to the `PropertyGroup` in `acceptance.Specs/Todo.Acceptance.Specs.csproj`.
+- **The DSL's unit tests see its internals too.** Add `<ItemGroup><InternalsVisibleTo Include="Todo.Acceptance.Dsl.UnitTests" /></ItemGroup>` to `acceptance.Dsl/Todo.Acceptance.Dsl.csproj`. Step 4 shows the tests' own project file, which is set up like the specs'.
 - **The specs and the DSL run the analyzer.** Add these lines to both files:
   - `acceptance.Specs/Todo.Acceptance.Specs.csproj`
   - `acceptance.Dsl/Todo.Acceptance.Dsl.csproj`
@@ -101,7 +111,7 @@ Each layer gets its own project, so the compiler enforces the layering. A few pr
   ```
   That loads it into the compiler, rather than referencing it as a library. Step 4 shows the analyzer's own project file.
 
-Then delete the templates' three `Class1.cs` files and `UnitTest1.cs`, and install the browser:
+Then delete the templates' three `Class1.cs` files and both `UnitTest1.cs` files, and install the browser:
 
 ```bash
 dotnet build acceptance.Specs
@@ -207,8 +217,10 @@ acceptance.Dsl/                 the DSL layer: the words specs use
     Alias.cs                    unique names per test
     SpecContext.cs              what a spec shares across domains
     ArrangementFailedException.cs   a failed arrangement, not a failed spec
+    InvalidSpecException.cs     a mistake in the spec, not a failure of the system
     ISutDsl.cs                  what every domain says through Sut.
     DslBase.cs                  the base for each domain's DSL
+    Vocabulary.cs               translates domain words, rejecting unknown ones
     Wiring/                     how specs reach the DSL (harness agent)
       ChannelType.cs            which channel this run uses
       ChannelsAttribute.cs      limits a spec to some channels
@@ -231,6 +243,11 @@ acceptance.Analyzers/           checks how specs call the DSL (harness agent)
   DslAnalyzer.cs
   AnalyzerReleases.Shipped.md
   AnalyzerReleases.Unshipped.md
+acceptance.Dsl.UnitTests/       tests for what the specs never exercise
+  Core/
+    AliasTests.cs
+    DslBaseTests.cs
+    VocabularyTests.cs
 ```
 
 Each layer is its own project, and each project has a `Core/` folder for what every domain shares and one folder per domain (`Todos/`, later perhaps `Lists/`). Adding a domain is adding one folder in each project.
@@ -243,6 +260,7 @@ The projects reference each other in one direction only, and the compiler enforc
 - **Only the DSL sees the drivers.** Everything in `acceptance.Drivers` is `internal`, and `InternalsVisibleTo` names the DSL as the one project allowed in.
 - **Only the drivers see Playwright.** The DSL and the specs get it at runtime, but can't compile against it.
 - **Drivers can't give verdicts.** `acceptance.Drivers` has no xUnit, so `Assert` doesn't exist there. Playwright's own assertions do, because they ship in the package the drivers need: `using static Microsoft.Playwright.Assertions;` in a driver means a verdict has crept into the wrong layer. Drivers report, the DSL decides.
+- **The DSL's unit tests see its internals.** They test the DSL's own code directly, including what a passing suite never runs: its failure paths and their messages.
 - **Specs name every argument they pass to the DSL.** The analyzer makes a positional argument a build error, in `acceptance.Specs` and in anything else outside the DSL. The end of this step explains why.
 
 A **channel** is one way of reaching the whole system: the public API or the browser. Its driver interfaces are split by domain and by **capability**. A capability every channel must support, like `ITodoDriver`, is required. One only some channels support, like `ITodoEntryDriver` (live feedback while a new todo is being entered, which only a browser has), is optional: channels that don't support it simply don't mention it. Each channel has one driver class per domain, implementing every capability it supports, so `UiTodoDriver` implements both.
@@ -530,6 +548,16 @@ namespace acceptance.Core.Dsl;
 public sealed class ArrangementFailedException(string message) : Exception(message);
 ```
 
+### acceptance.Dsl/Core/InvalidSpecException.cs
+
+A spec can fail for three reasons, and each has its own signal. An assertion failure means the system misbehaved. `ArrangementFailedException` means the spec never reached the behaviour it checks. `InvalidSpecException` means the spec itself is wrong, such as a word the DSL doesn't know, and nothing was sent to the system.
+
+```csharp
+namespace acceptance.Core.Dsl;
+
+public sealed class InvalidSpecException(string problem) : Exception($"The spec is wrong: {problem}");
+```
+
 ### acceptance.Dsl/Core/ISutDsl.cs
 
 What every domain's DSL says through `Sut.`. Each domain's `Sut` interface extends it, so `Sut.Todos.ConfirmErrorIsShown(...)` works without the todo DSL declaring it. `Api.` doesn't offer it: an arrangement is never expected to fail.
@@ -592,6 +620,30 @@ internal abstract class DslBase : ISutDsl
         Assert.Equal(message, _context.LastResult.Error);
         return Task.CompletedTask;
     }
+}
+```
+
+### acceptance.Dsl/Core/Vocabulary.cs
+
+Translates the words specs use into the values the drivers take. Specs speak in domain language, such as `priority: "high"`, and the system has its own representation, which specs never see. Translating and checking are one step: a word the vocabulary doesn't know throws `InvalidSpecException`, listing the words it does know, so every DSL method that takes a domain word gives the same kind of message. Words are added through an `init` indexer, so a vocabulary can't change once it's built, and a word can't be given two meanings. Words must match exactly, which keeps specs consistent. Step 9 uses one.
+
+```csharp
+namespace acceptance.Core.Dsl;
+
+internal sealed class Vocabulary<T>(string meaning)
+{
+    private readonly OrderedDictionary<string, T> _words = new(StringComparer.Ordinal);
+
+    public T this[string word]
+    {
+        init => _words.Add(word, value);
+    }
+
+    public T Translate(string word) =>
+        _words.TryGetValue(word, out var value)
+            ? value
+            : throw new InvalidSpecException(
+                $"'{word}' is not a recognised {meaning}. Use one of: {string.Join(", ", _words.Keys)}.");
 }
 ```
 
@@ -1252,7 +1304,274 @@ public sealed class DslAnalyzer : DiagnosticAnalyzer
 }
 ```
 
-Run `dotnet build acceptance.Specs`, which builds all four projects. It should compile with no tests yet. Commit.
+### The DSL's unit tests
+
+The specs exercise the DSL every time they pass, but only its happy paths. The code for when something goes wrong, such as an arrangement that fails or a channel that lacks a capability, never runs in a passing suite, so a mistake there would only show on the day you need its message to be right. `acceptance.Dsl.UnitTests` tests that code directly. The drivers and the wiring have no unit tests: they only mean something against a running system, so the acceptance suite is their test.
+
+### acceptance.Dsl.UnitTests/Todo.Acceptance.Dsl.UnitTests.csproj
+
+Replace the template's project file with this. It doesn't run the analyzer, which checks how specs call the DSL; these tests call the DSL's internals directly.
+
+```xml
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit.v3.mtp-off" Version="4.0.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="4.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../acceptance.Dsl/Todo.Acceptance.Dsl.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+</Project>
+```
+
+### acceptance.Dsl.UnitTests/Core/AliasTests.cs
+
+What makes specs safe to run in parallel: a name means the same within a spec and something different in every other.
+
+```csharp
+namespace acceptance.Core.Dsl.UnitTests;
+
+public class AliasTests
+{
+    [Fact]
+    public void TheSameNameGivesTheSameAliasWithinASpec()
+    {
+        var alias = new Alias();
+
+        Assert.Equal(alias.For("Buy milk"), alias.For("Buy milk"));
+    }
+
+    [Fact]
+    public void TheSameNameGivesADifferentAliasInEachSpec()
+    {
+        Assert.NotEqual(new Alias().For("Buy milk"), new Alias().For("Buy milk"));
+    }
+
+    [Fact]
+    public void AnAliasStartsWithTheNameItStandsFor()
+    {
+        Assert.StartsWith("Buy milk_", new Alias().For("Buy milk"));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void ABlankNameIsLeftUnchanged(string name)
+    {
+        Assert.Equal(name, new Alias().For(name));
+    }
+
+    [Theory]
+    [InlineData(8)]
+    [InlineData(256)]
+    public void AnAliasOfLengthIsExactlyThatLong(int length)
+    {
+        Assert.Equal(length, new Alias().OfLength(length).Length);
+    }
+
+    [Fact]
+    public void AnAliasOfLengthMustHaveRoomForTheSuffix()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new Alias().OfLength(7));
+    }
+}
+```
+
+### acceptance.Dsl.UnitTests/Core/DslBaseTests.cs
+
+The failure paths: which kind of failure each mistake turns into, and what its message says. `TestDsl` is a minimal DSL that exposes `DslBase`'s protected methods to the tests.
+
+```csharp
+using acceptance.Core.Drivers;
+using Xunit.Sdk;
+
+namespace acceptance.Core.Dsl.UnitTests;
+
+public class DslBaseTests
+{
+    private readonly SpecContext _context = new();
+
+    private TestDsl Sut => new(_context);
+    private TestDsl Api => new(_context.ForPinnedChannel("Api"));
+
+    [Fact]
+    public void ASuccessfulActionIsConfirmed()
+    {
+        var dsl = Sut;
+        dsl.RecordResult(DriverResult.Okay);
+
+        dsl.ConfirmSucceeded();
+    }
+
+    [Fact]
+    public void AFailedActionOnTheChannelUnderTestFailsTheSpec()
+    {
+        var dsl = Sut;
+        dsl.RecordResult(DriverResult.Fail("A title is required"));
+
+        var failure = Assert.ThrowsAny<Exception>(dsl.ConfirmSucceeded);
+
+        Assert.IsAssignableFrom<IAssertionException>(failure);
+        Assert.Contains("The system said: A title is required", failure.Message);
+    }
+
+    [Fact]
+    public void AFailedActionOnThePinnedChannelIsAnArrangementFailure()
+    {
+        var dsl = Api;
+        dsl.RecordResult(DriverResult.Fail("A title is required"));
+
+        var failure = Assert.Throws<ArrangementFailedException>(dsl.ConfirmSucceeded);
+
+        Assert.Contains("through Api", failure.Message);
+        Assert.Contains("The system said: A title is required", failure.Message);
+    }
+
+    [Fact]
+    public void ConfirmingWithNoActionRecordedIsAHarnessError()
+    {
+        Assert.Throws<InvalidOperationException>(Sut.ConfirmSucceeded);
+    }
+
+    [Fact]
+    public void ACapabilityTheChannelHasIsReturned()
+    {
+        var capability = new object();
+
+        Assert.Same(capability, Sut.RequireCapability(capability));
+    }
+
+    [Fact]
+    public void ACapabilityTheChannelUnderTestLacksSuggestsLimitingTheSpecsChannels()
+    {
+        var failure = Assert.Throws<InvalidOperationException>(() => Sut.RequireCapability(null));
+
+        Assert.Contains("live feedback", failure.Message);
+        Assert.Contains("[Fact, Channels(", failure.Message);
+    }
+
+    [Fact]
+    public void ACapabilityThePinnedChannelLacksSuggestsAddingItToItsDrivers()
+    {
+        var failure = Assert.Throws<InvalidOperationException>(() => Api.RequireCapability(null));
+
+        Assert.Contains("live feedback through Api", failure.Message);
+        Assert.Contains("drivers", failure.Message);
+    }
+
+    [Fact]
+    public async Task AnErrorIsConfirmedWhenTheLastActionFailedWithIt()
+    {
+        var dsl = Sut;
+        dsl.RecordResult(DriverResult.Fail("A title is required"));
+
+        await dsl.ConfirmErrorIsShown("A title is required");
+    }
+
+    [Fact]
+    public async Task AnErrorIsNotConfirmedWhenTheLastActionSucceeded()
+    {
+        var dsl = Sut;
+        dsl.RecordResult(DriverResult.Okay);
+
+        var failure = await Assert.ThrowsAnyAsync<Exception>(() => dsl.ConfirmErrorIsShown("A title is required"));
+
+        Assert.IsAssignableFrom<IAssertionException>(failure);
+        Assert.Contains("Expected the last action to fail, but it succeeded.", failure.Message);
+    }
+
+    [Fact]
+    public async Task AnErrorIsNotConfirmedWhenTheSystemSaidSomethingElse()
+    {
+        var dsl = Sut;
+        dsl.RecordResult(DriverResult.Fail("The title is too long"));
+
+        var failure = await Assert.ThrowsAnyAsync<Exception>(() => dsl.ConfirmErrorIsShown("A title is required"));
+
+        Assert.IsAssignableFrom<IAssertionException>(failure);
+    }
+
+    private sealed class TestDsl(SpecContext context) : DslBase(context)
+    {
+        public void RecordResult(DriverResult result) => Record(result);
+
+        public void ConfirmSucceeded() => ConfirmLastActionSucceeded("Could not add todo 'Buy milk'");
+
+        public object RequireCapability(object? capability) => Require(capability, "live feedback");
+    }
+}
+```
+
+### acceptance.Dsl.UnitTests/Core/VocabularyTests.cs
+
+A known word is translated; an unknown one is a mistake in the spec, with a message that says how to fix it.
+
+```csharp
+namespace acceptance.Core.Dsl.UnitTests;
+
+public class VocabularyTests
+{
+    private enum Priority { Low, Normal, High }
+
+    private static readonly Vocabulary<Priority> Priorities = new("priority")
+    {
+        ["low"] = Priority.Low,
+        ["normal"] = Priority.Normal,
+        ["high"] = Priority.High,
+    };
+
+    [Fact]
+    public void AKnownWordIsTranslated()
+    {
+        Assert.Equal(Priority.High, Priorities.Translate("high"));
+    }
+
+    [Fact]
+    public void AnUnknownWordIsAMistakeInTheSpec()
+    {
+        var mistake = Assert.Throws<InvalidSpecException>(() => Priorities.Translate("hihg"));
+
+        Assert.Equal(
+            "The spec is wrong: 'hihg' is not a recognised priority. Use one of: low, normal, high.",
+            mistake.Message);
+    }
+
+    [Fact]
+    public void WordsMustMatchExactly()
+    {
+        Assert.Throws<InvalidSpecException>(() => Priorities.Translate("High"));
+    }
+
+    [Fact]
+    public void AWordCanOnlyMeanOneThing()
+    {
+        Assert.Throws<ArgumentException>(() => new Vocabulary<Priority>("priority")
+        {
+            ["low"] = Priority.Low,
+            ["low"] = Priority.Normal,
+        });
+    }
+}
+```
+
+Run `dotnet build acceptance.Specs`, which builds the drivers, the DSL, the analyzer and the specs. It should compile with no specs yet. Then run `dotnet test acceptance.Dsl.UnitTests`, which should pass. Commit.
 
 ## Step 5: Roles and guardrails
 
@@ -1262,7 +1581,7 @@ So every Claude Code session has one **role**:
 
 | Role | May change | Typical work |
 | --- | --- | --- |
-| **Spec agent** (`spec-agent`) | `acceptance.Specs/`, `acceptance.Dsl/` and `acceptance.Drivers/`, except the harness plumbing | Write specs with you, grow the DSL, design driver contracts, watch specs fail |
+| **Spec agent** (`spec-agent`) | `acceptance.Specs/`, `acceptance.Dsl/`, `acceptance.Drivers/` and `acceptance.Dsl.UnitTests/`, except the harness plumbing | Write specs with you, grow the DSL, design driver contracts, watch specs fail |
 | **App agent** (`app-agent`) | `api/`, `api.UnitTests/`, `api.IntegrationTests/`, `web/` | Make a committed, failing spec pass |
 | **Harness agent** (`harness-agent`) | The harness wiring, the analyzer, scripts, Claude Code settings, deployment files and this guide | Improve the template, on the `template` branch |
 | **Free agent** (`free-agent`) | Anything | Cross-cutting work; changes that cross the other agents' boundaries are reported to you |
@@ -1390,7 +1709,8 @@ The ownership table: the single source of truth for who may change what. A folde
       "owns": [
         "acceptance.Specs/",
         "acceptance.Dsl/",
-        "acceptance.Drivers/"
+        "acceptance.Drivers/",
+        "acceptance.Dsl.UnitTests/"
       ]
     },
     "app-agent": {
@@ -1413,6 +1733,7 @@ The ownership table: the single source of truth for who may change what. A folde
         "acceptance.Specs/Todo.Acceptance.Specs.csproj",
         "acceptance.Dsl/Todo.Acceptance.Dsl.csproj",
         "acceptance.Drivers/Todo.Acceptance.Drivers.csproj",
+        "acceptance.Dsl.UnitTests/Todo.Acceptance.Dsl.UnitTests.csproj",
         "acceptance.Analyzers/",
         ".claude/",
         "scripts/",
@@ -1533,9 +1854,13 @@ You help the human write executable specifications. You never implement them.
   in for "missing". A parameter no spec could leave out stays required,
   so a spec that omits it doesn't compile.
 - When a DSL parameter takes a value in domain language, such as
-  `due: "yesterday"`, the DSL throws on any value it doesn't recognise,
-  such as `due: "yesterdy"`, with a message saying the spec is wrong, not
-  the system.
+  `due: "yesterday"`, translate it with a `Vocabulary` from
+  `acceptance.Dsl/Core`. It throws on any value it doesn't recognise, such
+  as `due: "yesterdy"`, with a message saying the spec is wrong, not the
+  system.
+- Cover what the specs never exercise in `acceptance.Dsl/Core`, such as
+  failure paths and their messages, with tests in
+  `acceptance.Dsl.UnitTests`.
 - Read the app code only to understand current behaviour. Never shape a
   spec around how the code happens to work.
 - When a spec needs new DSL methods or driver contract (endpoints, status
@@ -1544,7 +1869,8 @@ You help the human write executable specifications. You never implement them.
 - Prefer specs for every channel. Use `[Fact, Channels(...)]` only for
   behaviour a channel genuinely lacks, and split a business rule from its
   channel-specific feedback.
-- Check your work: `dotnet build acceptance.Specs` must pass, and
+- Check your work: `dotnet build acceptance.Specs` and
+  `dotnet test acceptance.Dsl.UnitTests` must pass, and
   `pwsh -File scripts/run-acceptance-tests.ps1` must show each new spec
   failing because the behaviour is missing, not because of broken plumbing.
 - Never make a spec pass. If a new spec already passes, say so.
@@ -1682,7 +2008,7 @@ The scripts are PowerShell, so they run the same on Windows, macOS and Linux wit
 | `scripts/set-role.ps1` | Sets the role for this worktree's next session, or shows the roles; the terminal version of the role commands |
 | `scripts/run-acceptance-tests.ps1` | Starts Docker if needed, deploys fresh containers, runs every spec on each channel, or on one with `-Channel ui`. With no specs yet, it says so and exits without deploying |
 | `scripts/check-ready-to-implement.ps1` | Checks the tree is clean and the named spec is committed |
-| `scripts/check-done.ps1` | The definition of done: the protected-files check, all unit tests, the API integration tests once that project exists, and all acceptance tests once there are specs. Anything it skips is reported as `SKIP` with the reason |
+| `scripts/check-done.ps1` | The definition of done: the protected-files check, all unit tests, the DSL's included, the API integration tests once that project exists, and all acceptance tests once there are specs. Anything it skips is reported as `SKIP` with the reason |
 
 The ones you run most also have commands in the Claude Code chat, so they tab-complete: `/run-specs [channel]`, `/check-done` and `/check-ready <SpecName>`. Claude runs the script and summarises the result. The commands are small files in `.claude/commands/`; the scripts still work on their own in a terminal.
 
@@ -1826,7 +2152,7 @@ Run the loop exactly as before.
 3. Add what the DSL needs to `ITodoDriver`, then decide the contract: which endpoint and status code for the API driver, which `data-testid` for the UI driver. Update the contract comments.
 4. Watch it fail on both channels for the right reason, commit, hand over.
 
-Two rules apply as the DSL grows. Give a parameter a default only if some spec could sensibly leave it out, make it a real domain value, and declare it on the interface; the analyzer rejects a default on the class (ACC002). And when a parameter takes a value in domain language, such as `due: "yesterday"`, the DSL throws on any value it doesn't recognise, saying the spec is wrong rather than the system.
+Two rules apply as the DSL grows. Give a parameter a default only if some spec could sensibly leave it out, make it a real domain value, and declare it on the interface; the analyzer rejects a default on the class (ACC002). And when a parameter takes a value in domain language, such as `due: "yesterday"`, the DSL translates it with a `Vocabulary`, which throws on any value it doesn't recognise, saying the spec is wrong rather than the system. The next step puts both rules to work.
 
 **Or try a spec for one channel only.** The plumbing already has an optional capability, live feedback while typing, that only the UI channel supports. Start with the business rule, for every channel, then add the warning while typing, for the UI alone:
 
@@ -1853,7 +2179,75 @@ On the API run the second spec is reported as skipped; on the UI run it fails un
 
 This is where most of the real thinking lives, and where a spec agent earns its place: it can draft the spec, DSL and driver changes with you, and point out the decisions they force. You'll notice that writing the driver forces decisions a prose spec would leave vague.
 
-## Step 9: Prove the point
+## Step 9: A choice in domain language, a todo's priority
+
+A todo can be low, normal or high priority. This step adds one parameter to an existing DSL method, and shows four things at once: a default that leaves every existing spec unchanged, a word in a spec translated into whatever each channel needs, a typo in a spec caught before anything reaches the system, and the DSL's unit tests at work. Neither the DSL nor the drivers know about priority yet, so a spec agent is a good partner for this one.
+
+**1. Write the spec**, in `AddingTodos.cs`:
+
+```csharp
+[Fact]
+public async Task UserCanGiveATodoAHighPriority()
+{
+    await Sut.Todos.Add(title: "Pay rent", priority: "high");
+    await Sut.Todos.ConfirmPriority(title: "Pay rent", priority: "high");
+}
+```
+
+**2. Add the words to the DSL.** In `ITodosSutDsl`:
+
+```csharp
+Task AttemptToAdd(string title, string priority = "normal");
+Task Add(string title, string priority = "normal");
+Task ConfirmPriority(string title, string priority);
+```
+
+In `ITodosApiDsl`, `Add` and `AddCompleted` gain the same parameter with the same default, so a spec can arrange a todo with a priority too.
+
+Most specs don't care about priority, so it has a default, and the default is a real domain value: a user who doesn't choose gets a normal todo. Every existing call, such as `Add(title: "Buy milk")`, still compiles and still means what it did. The default goes on the interfaces, because specs call through them; put it on `TodosDsl` and the build fails with ACC002. `ConfirmPriority` has no default, because no spec checks a priority without saying which.
+
+**3. Translate the words.** In `TodosDsl`, a `Vocabulary` turns the spec's words into a `Priority`, a new `internal` enum in `acceptance.Drivers/Todos`:
+
+```csharp
+private static readonly Vocabulary<Priority> Priorities = new("priority")
+{
+    ["low"] = Priority.Low,
+    ["normal"] = Priority.Normal,
+    ["high"] = Priority.High,
+};
+
+public async Task AttemptToAdd(string title, string priority) =>
+    Record(await Todos.Add(Alias.For(title), Priorities.Translate(priority)));
+
+public async Task ConfirmPriority(string title, string priority) =>
+    Assert.True(await Todos.HasPriority(Alias.For(title), Priorities.Translate(priority)),
+        $"Expected todo '{title}' to have priority '{priority}'");
+```
+
+The class's methods have no defaults, so its calls to itself pass a priority: `Add` hands its `priority` on to `AttemptToAdd`, and `AttemptToAddWithTitleOfLength` passes `Priority.Normal`, because that spec is about the title.
+
+Each driver then turns `Priority` into its own channel's format: the API driver sends `"high"` in the JSON, and the UI driver picks `high` in a select. The words in the specs, the enum and each channel's format are three separate things, so the API could spell priorities differently tomorrow without any spec changing.
+
+**4. Decide the contract.** `ITodoDriver.Add` takes a `Priority`, and a new `HasPriority(title, priority)` waits for a yes before answering no, like the other queries. Update the contract comments:
+
+- **API:** `POST /api/todos` takes `{ title, priority }`, where priority is `"low"`, `"normal"` or `"high"`, and `GET` returns each todo's `priority`.
+- **UI:** a `new-todo-priority` select with the options `low`, `normal` and `high`, starting at `normal`, and a `data-priority` attribute on each `todo-item`, like `data-completed`.
+
+The UI driver touches the select only for a priority other than normal, just as a user who doesn't care leaves it alone. That's why the contract says the select starts at normal, and it's also why the existing UI specs keep passing before the select exists.
+
+**5. Watch it fail, for the right reason.** Run `pwsh -File scripts/run-acceptance-tests.ps1`. On the API, the new spec fails at `ConfirmPriority`, because the API ignores a field it doesn't know. On the UI, it times out looking for `new-todo-priority`. Every other spec still passes on both channels: the parameter was added without breaking anything.
+
+**6. Misspell a word.** Change `"high"` to `"hihg"` and run the specs again. Both channels fail with "The spec is wrong: 'hihg' is not a recognised priority. Use one of: low, normal, high." before anything is sent to the system. That's the third kind of failure: not the system misbehaving, and not an arrangement failing, but the spec being wrong. A passing suite never shows this message, so `VocabularyTests` in `acceptance.Dsl.UnitTests` keeps it right. Change the word back.
+
+**7. Commit and hand it over** in a new app-agent session:
+
+```text
+/implement-spec UserCanGiveATodoAHighPriority
+```
+
+Run the same review checklist as step 6.
+
+## Step 10: Prove the point
 
 This is the payoff: big implementation changes with zero changes to the acceptance projects. Try at least the first two.
 
@@ -1879,6 +2273,7 @@ If a spec breaks during 1 or 2, look at why. It usually means the spec or driver
 | A spec is reported as skipped | It's limited to other channels with `[Channels(...)]`, which is expected |
 | "No specs in acceptance.Specs yet" | Expected on a fresh template; `check-done.ps1` reports the acceptance tests as `SKIP` until the first spec exists |
 | Build error ACC001 | A spec passed a DSL argument positionally; name it, as in `title: "Buy milk"` |
+| "The spec is wrong: …" | The spec used a word the DSL doesn't know, such as a misspelt priority; the message lists the words it does know, and nothing was sent to the system |
 | Build error ACC002 | A DSL default is declared on the class; move it to the DSL interface the specs call through |
 | `Sut.Todos` or `Api.Todos` has no such method | The method exists in `TodosDsl` but isn't listed on that root's interface, `ITodosSutDsl` or `ITodosApiDsl` |
 | "An arrangement through Api failed" | The spec's starting state couldn't be set up through the API, so the behaviour under test was never reached; fix whatever broke the arranging action first |

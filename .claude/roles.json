@@ -16,7 +16,8 @@
       "owns": [
         "acceptance.Specs/",
         "acceptance.Dsl/",
-        "acceptance.Drivers/"
+        "acceptance.Drivers/",
+        "acceptance.Dsl.UnitTests/"
       ]
     },
     "app-agent": {
@@ -39,6 +40,7 @@
         "acceptance.Specs/Todo.Acceptance.Specs.csproj",
         "acceptance.Dsl/Todo.Acceptance.Dsl.csproj",
         "acceptance.Drivers/Todo.Acceptance.Drivers.csproj",
+        "acceptance.Dsl.UnitTests/Todo.Acceptance.Dsl.UnitTests.csproj",
         "acceptance.Analyzers/",
         ".claude/",
         "scripts/",

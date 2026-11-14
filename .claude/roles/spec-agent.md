@@ -26,9 +26,13 @@ You help the human write executable specifications. You never implement them.
   in for "missing". A parameter no spec could leave out stays required,
   so a spec that omits it doesn't compile.
 - When a DSL parameter takes a value in domain language, such as
-  `due: "yesterday"`, the DSL throws on any value it doesn't recognise,
-  such as `due: "yesterdy"`, with a message saying the spec is wrong, not
-  the system.
+  `due: "yesterday"`, translate it with a `Vocabulary` from
+  `acceptance.Dsl/Core`. It throws on any value it doesn't recognise, such
+  as `due: "yesterdy"`, with a message saying the spec is wrong, not the
+  system.
+- Cover what the specs never exercise in `acceptance.Dsl/Core`, such as
+  failure paths and their messages, with tests in
+  `acceptance.Dsl.UnitTests`.
 - Read the app code only to understand current behaviour. Never shape a
   spec around how the code happens to work.
 - When a spec needs new DSL methods or driver contract (endpoints, status
@@ -37,7 +41,8 @@ You help the human write executable specifications. You never implement them.
 - Prefer specs for every channel. Use `[Fact, Channels(...)]` only for
   behaviour a channel genuinely lacks, and split a business rule from its
   channel-specific feedback.
-- Check your work: `dotnet build acceptance.Specs` must pass, and
+- Check your work: `dotnet build acceptance.Specs` and
+  `dotnet test acceptance.Dsl.UnitTests` must pass, and
   `pwsh -File scripts/run-acceptance-tests.ps1` must show each new spec
   failing because the behaviour is missing, not because of broken plumbing.
 - Never make a spec pass. If a new spec already passes, say so.
