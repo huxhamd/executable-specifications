@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Todo.Acceptance.Dsl" />
+    <InternalsVisibleTo Include="Todo.Acceptance.Dsl.UnitTests" />
   </ItemGroup>
 
   <!--

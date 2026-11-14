@@ -19,6 +19,7 @@ $hasSpecs = [bool](Get-ChildItem acceptance.Specs -Recurse -Filter *.cs |
 
 Invoke-Check "Protected files"  { pwsh -NoProfile -File .claude/hooks/check-protected-files.ps1 }
 Invoke-Check "API unit tests"   { dotnet test api.UnitTests }
+Invoke-Check "DSL unit tests"   { dotnet test acceptance.Dsl.UnitTests }
 Invoke-Check "Web unit tests"   { Push-Location web; npx ng test --watch=false; Pop-Location }
 Invoke-CheckIf "API integration tests" (Test-Path api.IntegrationTests) "no project yet" { dotnet test api.IntegrationTests }
 Invoke-CheckIf "Acceptance tests" $hasSpecs "no specs yet" { pwsh -NoProfile -File scripts/run-acceptance-tests.ps1 }
