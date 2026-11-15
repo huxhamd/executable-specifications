@@ -7,7 +7,7 @@ namespace acceptance.Todos.Drivers;
 // UI contract (data-testid attributes):
 //   new-todo-title           text input for a new todo's title
 //   new-todo-priority        select for a new todo's priority, with options
-//                            low, normal and high; starts at normal
+//                            low, normal and high
 //   add-todo                 submit button; stays enabled, rejections show an error
 //   title-too-long-warning   visible while the title being typed is too long,
 //                            before the todo is submitted
@@ -19,12 +19,19 @@ namespace acceptance.Todos.Drivers;
 
 internal class UiTodoDriver(IPage page) : ITodoDriver, ITodoEntryDriver
 {
+    public async Task<DriverResult> Add(string title)
+    {
+        await page.GotoAsync("/");
+        await page.GetByTestId("new-todo-title").FillAsync(title);
+        await page.GetByTestId("add-todo").ClickAsync();
+        return await Outcome(LocateTodo(title));
+    }
+
     public async Task<DriverResult> Add(string title, Priority priority)
     {
         await page.GotoAsync("/");
         await page.GetByTestId("new-todo-title").FillAsync(title);
-        if (priority != Priority.Normal)
-            await page.GetByTestId("new-todo-priority").SelectOptionAsync(ToUi(priority));
+        await page.GetByTestId("new-todo-priority").SelectOptionAsync(ToUi(priority));
         await page.GetByTestId("add-todo").ClickAsync();
         return await Outcome(LocateTodo(title));
     }

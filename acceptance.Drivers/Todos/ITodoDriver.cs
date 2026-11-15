@@ -4,6 +4,7 @@ namespace acceptance.Todos.Drivers;
 
 internal interface ITodoDriver
 {
+    Task<DriverResult> Add(string title);
     Task<DriverResult> Add(string title, Priority priority);
     Task<DriverResult> Complete(string title);
 

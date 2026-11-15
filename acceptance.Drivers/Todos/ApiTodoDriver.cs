@@ -5,8 +5,8 @@ namespace acceptance.Todos.Drivers;
 
 // API contract:
 //   GET    /api/todos                  -> 200 [{ id, title, completed, priority }]
-//   POST   /api/todos                  -> body { title, priority }, where priority is
-//                                         "low", "normal" or "high"
+//   POST   /api/todos                  -> body { title } or { title, priority }, where
+//                                         priority is "low", "normal" or "high"
 //                                      -> 201, or 400 ValidationProblemDetails when rejected:
 //                                         { errors: { "<field>": ["<message>", ...] } },
 //                                         e.g. errors.title = ["A title is required"]
@@ -14,6 +14,9 @@ namespace acceptance.Todos.Drivers;
 
 internal class ApiTodoDriver(HttpClient http) : ITodoDriver
 {
+    public async Task<DriverResult> Add(string title) =>
+        await ToResult(await http.PostAsJsonAsync("/api/todos", new { title }));
+
     public async Task<DriverResult> Add(string title, Priority priority) =>
         await ToResult(await http.PostAsJsonAsync("/api/todos", new { title, priority = ToWire(priority) }));
 

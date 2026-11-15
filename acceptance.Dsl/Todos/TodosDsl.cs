@@ -27,11 +27,20 @@ internal class TodosDsl : DslBase, ITodosSutDsl, ITodosApiDsl
     private ITodoEntryDriver Entry =>
         Require(_channel.TodoEntry, "live feedback while entering a todo");
 
+    public async Task AttemptToAdd(string title) =>
+        Record(await Todos.Add(Alias.For(title)));
+
     public async Task AttemptToAdd(string title, string priority) =>
         Record(await Todos.Add(Alias.For(title), Priorities.Translate(priority)));
 
     public async Task AttemptToAddWithTitleOfLength(int length) =>
-        Record(await Todos.Add(Alias.OfLength(length), Priority.Normal));
+        Record(await Todos.Add(Alias.OfLength(length)));
+
+    public async Task Add(string title)
+    {
+        await AttemptToAdd(title);
+        ConfirmLastActionSucceeded($"Could not add todo '{title}'");
+    }
 
     public async Task Add(string title, string priority)
     {
@@ -67,9 +76,9 @@ internal class TodosDsl : DslBase, ITodosSutDsl, ITodosApiDsl
         Assert.True(await Entry.IsTitleTooLongWarningShown(),
             "Expected a warning that the title is too long");
 
-    public async Task AddCompleted(string title, string priority)
+    public async Task AddCompleted(string title)
     {
-        await Add(title, priority);
+        await Add(title);
         await Complete(title);
     }
 }
