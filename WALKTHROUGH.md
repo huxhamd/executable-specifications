@@ -1849,10 +1849,14 @@ You help the human write executable specifications. You never implement them.
   there already; never list `Attempt...` methods there. List a
   `Confirm...` method there only for an outcome that users of the channel
   under test don't see.
-- Give a DSL parameter a default only if some spec could sensibly leave
-  it out. Make the default a real domain value, never `null` standing
-  in for "missing". A parameter no spec could leave out stays required,
-  so a spec that omits it doesn't compile.
+- When a spec could sensibly leave something out, model what a user who
+  doesn't care actually does. If they leave it to the system, add an
+  overload without that parameter that leaves it out on every channel,
+  so specs that don't mention it keep exercising exactly what they did.
+  Give a parameter a default only when the user must supply a value but
+  the spec doesn't care which. Make the default a real domain value,
+  never `null` standing in for "missing". A parameter no spec could
+  leave out stays required, so a spec that omits it doesn't compile.
 - When a DSL parameter takes a value in domain language, such as
   `due: "yesterday"`, translate it with a `Vocabulary` from
   `acceptance.Dsl/Core`. It throws on any value it doesn't recognise, such
@@ -2152,7 +2156,7 @@ Run the loop exactly as before.
 3. Add what the DSL needs to `ITodoDriver`, then decide the contract: which endpoint and status code for the API driver, which `data-testid` for the UI driver. Update the contract comments.
 4. Watch it fail on both channels for the right reason, commit, hand over.
 
-Two rules apply as the DSL grows. Give a parameter a default only if some spec could sensibly leave it out, make it a real domain value, and declare it on the interface; the analyzer rejects a default on the class (ACC002). And when a parameter takes a value in domain language, such as `due: "yesterday"`, the DSL translates it with a `Vocabulary`, which throws on any value it doesn't recognise, saying the spec is wrong rather than the system. The next step puts both rules to work.
+Two rules apply as the DSL grows. When a spec could leave a parameter out, model what a user who doesn't care actually does: if they leave the choice to the system, add an overload without the parameter. Give a parameter a default only when the user must supply some value but the spec doesn't care which, make it a real domain value, and declare it on the interface; the analyzer rejects a default on the class (ACC002). And when a parameter takes a value in domain language, such as `due: "yesterday"`, the DSL translates it with a `Vocabulary`, which throws on any value it doesn't recognise, saying the spec is wrong rather than the system. The next step puts both rules to work.
 
 **Or try a spec for one channel only.** The plumbing already has an optional capability, live feedback while typing, that only the UI channel supports. Start with the business rule, for every channel, then add the warning while typing, for the UI alone:
 
@@ -2181,9 +2185,9 @@ This is where most of the real thinking lives, and where a spec agent earns its 
 
 ## Step 9: A choice in domain language, a todo's priority
 
-A todo can be low, normal or high priority. This step adds one parameter to an existing DSL method, and shows four things at once: a default that leaves every existing spec unchanged, a word in a spec translated into whatever each channel needs, a typo in a spec caught before anything reaches the system, and the DSL's unit tests at work. Neither the DSL nor the drivers know about priority yet, so a spec agent is a good partner for this one.
+A todo can be low, normal or high priority, and a user who doesn't choose gets a normal one. This step adds priority without changing what any existing spec means, translates a word in a spec into whatever each channel needs, catches a typo in a spec before anything reaches the system, and puts the DSL's unit tests to work. Neither the DSL nor the drivers know about priority yet, so a spec agent is a good partner for this one.
 
-**1. Write the spec**, in `AddingTodos.cs`:
+**1. Write the specs**, in `AddingTodos.cs`: one for a user who chooses a priority, and one for a user who doesn't.
 
 ```csharp
 [Fact]
@@ -2192,19 +2196,30 @@ public async Task UserCanGiveATodoAHighPriority()
     await Sut.Todos.Add(title: "Pay rent", priority: "high");
     await Sut.Todos.ConfirmPriority(title: "Pay rent", priority: "high");
 }
+
+[Fact]
+public async Task ATodoHasNormalPriorityUnlessTheUserChoosesOne()
+{
+    await Sut.Todos.Add(title: "Buy milk");
+    await Sut.Todos.ConfirmPriority(title: "Buy milk", priority: "normal");
+}
 ```
 
-**2. Add the words to the DSL.** In `ITodosSutDsl`:
+**2. Ask what a user who doesn't care does.** Most specs don't mention priority, so it's tempting to give `Add` a `priority` parameter with the default `"normal"`. But a default is a choice the DSL makes on the user's behalf, and a user who doesn't care doesn't choose normal. They don't choose at all, and the system decides. With that default, every existing `Add(title: "Buy milk")` would quietly start sending `normal`. The specs would still compile and pass, but none of them would exercise adding a todo without a priority any more, and the second spec above couldn't be written. It's the same trap that named arguments guard against: a spec that still compiles but now means something different.
+
+So priority is an overload, not a default. In `ITodosSutDsl`:
 
 ```csharp
-Task AttemptToAdd(string title, string priority = "normal");
-Task Add(string title, string priority = "normal");
+Task AttemptToAdd(string title);
+Task AttemptToAdd(string title, string priority);
+Task Add(string title);
+Task Add(string title, string priority);
 Task ConfirmPriority(string title, string priority);
 ```
 
-In `ITodosApiDsl`, `Add` and `AddCompleted` gain the same parameter with the same default, so a spec can arrange a todo with a priority too.
+The methods without `priority` are unchanged all the way down to the drivers, so every existing spec runs exactly the code it ran before. `ITodosApiDsl` doesn't change, because no spec needs to arrange a todo with a priority yet. `ConfirmPriority` has no overload without a priority, because no spec checks a priority without saying which.
 
-Most specs don't care about priority, so it has a default, and the default is a real domain value: a user who doesn't choose gets a normal todo. Every existing call, such as `Add(title: "Buy milk")`, still compiles and still means what it did. The default goes on the interfaces, because specs call through them; put it on `TodosDsl` and the build fails with ACC002. `ConfirmPriority` has no default, because no spec checks a priority without saying which.
+Defaults still have a place: when a user must supply a value but the spec doesn't care which, such as a delivery address in a spec about payment. Then the default is a real domain value, declared on the interface; put it on the class and the build fails with ACC002.
 
 **3. Translate the words.** In `TodosDsl`, a `Vocabulary` turns the spec's words into a `Priority`, a new `internal` enum in `acceptance.Drivers/Todos`:
 
@@ -2224,25 +2239,23 @@ public async Task ConfirmPriority(string title, string priority) =>
         $"Expected todo '{title}' to have priority '{priority}'");
 ```
 
-The class's methods have no defaults, so its calls to itself pass a priority: `Add` hands its `priority` on to `AttemptToAdd`, and `AttemptToAddWithTitleOfLength` passes `Priority.Normal`, because that spec is about the title.
-
 Each driver then turns `Priority` into its own channel's format: the API driver sends `"high"` in the JSON, and the UI driver picks `high` in a select. The words in the specs, the enum and each channel's format are three separate things, so the API could spell priorities differently tomorrow without any spec changing.
 
-**4. Decide the contract.** `ITodoDriver.Add` takes a `Priority`, and a new `HasPriority(title, priority)` waits for a yes before answering no, like the other queries. Update the contract comments:
+**4. Decide the contract.** `ITodoDriver` gains `Add(title, priority)` beside the original `Add(title)`, and a `HasPriority(title, priority)` that waits for a yes before answering no, like the other queries. Update the contract comments:
 
-- **API:** `POST /api/todos` takes `{ title, priority }`, where priority is `"low"`, `"normal"` or `"high"`, and `GET` returns each todo's `priority`.
-- **UI:** a `new-todo-priority` select with the options `low`, `normal` and `high`, starting at `normal`, and a `data-priority` attribute on each `todo-item`, like `data-completed`.
+- **API:** `POST /api/todos` takes `{ title }` or `{ title, priority }`, where priority is `"low"`, `"normal"` or `"high"`, and `GET` returns each todo's `priority`.
+- **UI:** a `new-todo-priority` select with the options `low`, `normal` and `high`, and a `data-priority` attribute on each `todo-item`, like `data-completed`.
 
-The UI driver touches the select only for a priority other than normal, just as a user who doesn't care leaves it alone. That's why the contract says the select starts at normal, and it's also why the existing UI specs keep passing before the select exists.
+Each driver's original `Add(title)` is untouched: the API driver still sends only the title, and the UI driver never touches the select. That's what not choosing looks like on each channel, and it's what the second spec relies on. What the system does when nobody chooses isn't in the contract; it's a product rule, so the spec decides it.
 
-**5. Watch it fail, for the right reason.** Run `pwsh -File scripts/run-acceptance-tests.ps1`. On the API, the new spec fails at `ConfirmPriority`, because the API ignores a field it doesn't know. On the UI, it times out looking for `new-todo-priority`. Every other spec still passes on both channels: the parameter was added without breaking anything.
+**5. Watch them fail, for the right reason.** Run `pwsh -File scripts/run-acceptance-tests.ps1`. On the API, both new specs fail at `ConfirmPriority`, because the API ignores a field it doesn't know and returns no priority. On the UI, the first times out looking for `new-todo-priority`, and the second fails at `ConfirmPriority`, because no `todo-item` has a `data-priority`. Every other spec still passes on both channels, running exactly the code it ran before.
 
 **6. Misspell a word.** Change `"high"` to `"hihg"` and run the specs again. Both channels fail with "The spec is wrong: 'hihg' is not a recognised priority. Use one of: low, normal, high." before anything is sent to the system. That's the third kind of failure: not the system misbehaving, and not an arrangement failing, but the spec being wrong. A passing suite never shows this message, so `VocabularyTests` in `acceptance.Dsl.UnitTests` keeps it right. Change the word back.
 
 **7. Commit and hand it over** in a new app-agent session:
 
 ```text
-/implement-spec UserCanGiveATodoAHighPriority
+/implement-spec UserCanGiveATodoAHighPriority and ATodoHasNormalPriorityUnlessTheUserChoosesOne
 ```
 
 Run the same review checklist as step 6.
