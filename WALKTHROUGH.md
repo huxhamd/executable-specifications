@@ -1853,10 +1853,13 @@ You help the human write executable specifications. You never implement them.
   doesn't care actually does. If they leave it to the system, add an
   overload without that parameter that leaves it out on every channel,
   so specs that don't mention it keep exercising exactly what they did.
-  Give a parameter a default only when the user must supply a value but
-  the spec doesn't care which. Make the default a real domain value,
-  never `null` standing in for "missing". A parameter no spec could
-  leave out stays required, so a spec that omits it doesn't compile.
+  What the system then does is a product default. That's a requirement,
+  so a spec states it; the DSL never supplies it.
+- Give a parameter a DSL default, a value the harness fills in on the
+  user's behalf, only when the user must supply a value but the spec
+  doesn't care which. Make it a real domain value, never `null` standing
+  in for "missing". A parameter no spec could leave out stays required,
+  so a spec that omits it doesn't compile.
 - When a DSL parameter takes a value in domain language, such as
   `due: "yesterday"`, translate it with a `Vocabulary` from
   `acceptance.Dsl/Core`. It throws on any value it doesn't recognise, such
@@ -2156,7 +2159,7 @@ Run the loop exactly as before.
 3. Add what the DSL needs to `ITodoDriver`, then decide the contract: which endpoint and status code for the API driver, which `data-testid` for the UI driver. Update the contract comments.
 4. Watch it fail on both channels for the right reason, commit, hand over.
 
-Two rules apply as the DSL grows. When a spec could leave a parameter out, model what a user who doesn't care actually does: if they leave the choice to the system, add an overload without the parameter. Give a parameter a default only when the user must supply some value but the spec doesn't care which, make it a real domain value, and declare it on the interface; the analyzer rejects a default on the class (ACC002). And when a parameter takes a value in domain language, such as `due: "yesterday"`, the DSL translates it with a `Vocabulary`, which throws on any value it doesn't recognise, saying the spec is wrong rather than the system. The next step puts both rules to work.
+Two rules apply as the DSL grows. When a spec could leave a parameter out, model what a user who doesn't care actually does: if they leave the choice to the system, add an overload without the parameter, and let a spec state what the system then does. That's a product default, and it's a requirement. Give a parameter a DSL default, a value the harness fills in for the user, only when the user must supply some value but the spec doesn't care which. Make it a real domain value, and declare it on the interface; the analyzer rejects a default on the class (ACC002). And when a parameter takes a value in domain language, such as `due: "yesterday"`, the DSL translates it with a `Vocabulary`, which throws on any value it doesn't recognise, saying the spec is wrong rather than the system. The next step puts both rules to work.
 
 **Or try a spec for one channel only.** The plumbing already has an optional capability, live feedback while typing, that only the UI channel supports. Start with the business rule, for every channel, then add the warning while typing, for the UI alone:
 
@@ -2205,7 +2208,7 @@ public async Task ATodoHasNormalPriorityUnlessTheUserChoosesOne()
 }
 ```
 
-**2. Ask what a user who doesn't care does.** Most specs don't mention priority, so it's tempting to give `Add` a `priority` parameter with the default `"normal"`. But a default is a choice the DSL makes on the user's behalf, and a user who doesn't care doesn't choose normal. They don't choose at all, and the system decides. With that default, every existing `Add(title: "Buy milk")` would quietly start sending `normal`. The specs would still compile and pass, but none of them would exercise adding a todo without a priority any more, and the second spec above couldn't be written. It's the same trap that named arguments guard against: a spec that still compiles but now means something different.
+**2. Ask what a user who doesn't care does.** Most specs don't mention priority, so it's tempting to give `Add` a `priority` parameter with a DSL default of `"normal"`. But a DSL default is a choice the harness makes on the user's behalf, and a user who doesn't care doesn't choose normal. They don't choose at all, and the system decides. With that default, every existing `Add(title: "Buy milk")` would quietly start sending `normal`. The specs would still compile and pass, but none of them would exercise adding a todo without a priority any more, and the second spec above couldn't be written. Worse, the requirement would live only in the harness: an API that rejected todos without a priority, or made them low, would still pass every spec. It's the same trap that named arguments guard against: a spec that still compiles but now means something different.
 
 So priority is an overload, not a default. In `ITodosSutDsl`:
 
@@ -2219,7 +2222,7 @@ Task ConfirmPriority(string title, string priority);
 
 The methods without `priority` are unchanged all the way down to the drivers, so every existing spec runs exactly the code it ran before. `ITodosApiDsl` doesn't change, because no spec needs to arrange a todo with a priority yet. `ConfirmPriority` has no overload without a priority, because no spec checks a priority without saying which.
 
-Defaults still have a place: when a user must supply a value but the spec doesn't care which, such as a delivery address in a spec about payment. Then the default is a real domain value, declared on the interface; put it on the class and the build fails with ACC002.
+Two different things are called a default here, and only one belongs in the DSL. "A todo is normal unless the user chooses" is a **product default**: it's what the system does, so it's a requirement, and the second spec states it. That failing spec is how the app-agent learns the rule, and the app-agent decides how to meet it. A **DSL default** is a value the harness fills in on the user's behalf. It has a place only when a user must supply a value but the spec doesn't care which, such as a delivery address in a spec about payment. Then it's a real domain value, declared on the interface; put it on the class and the build fails with ACC002.
 
 **3. Translate the words.** In `TodosDsl`, a `Vocabulary` turns the spec's words into a `Priority`, a new `internal` enum in `acceptance.Drivers/Todos`:
 

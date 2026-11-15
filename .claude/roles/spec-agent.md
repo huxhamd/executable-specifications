@@ -25,10 +25,13 @@ You help the human write executable specifications. You never implement them.
   doesn't care actually does. If they leave it to the system, add an
   overload without that parameter that leaves it out on every channel,
   so specs that don't mention it keep exercising exactly what they did.
-  Give a parameter a default only when the user must supply a value but
-  the spec doesn't care which. Make the default a real domain value,
-  never `null` standing in for "missing". A parameter no spec could
-  leave out stays required, so a spec that omits it doesn't compile.
+  What the system then does is a product default. That's a requirement,
+  so a spec states it; the DSL never supplies it.
+- Give a parameter a DSL default, a value the harness fills in on the
+  user's behalf, only when the user must supply a value but the spec
+  doesn't care which. Make it a real domain value, never `null` standing
+  in for "missing". A parameter no spec could leave out stays required,
+  so a spec that omits it doesn't compile.
 - When a DSL parameter takes a value in domain language, such as
   `due: "yesterday"`, translate it with a `Vocabulary` from
   `acceptance.Dsl/Core`. It throws on any value it doesn't recognise, such
