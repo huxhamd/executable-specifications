@@ -12,6 +12,8 @@
  - Walkthrough section that uses the example
 
 * More than one actor: who is acting, and specs with two users. (Gap analysis point 6)
+ - Also the example of a DSL default: most specs act as a default user, aliased like everything else, and name a user only when it matters, e.g. `as: "alice"`
+ - Declare the default user once as a constant that both `Sut.` and `Api.` use, so a spec can't arrange as one user and check as another
 
 * Controlling the system's boundaries: the clock and stubs for external systems. (Gap analysis point 7)
 
