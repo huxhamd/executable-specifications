@@ -4,16 +4,18 @@ using acceptance.Core.Drivers;
 namespace acceptance.Todos.Drivers;
 
 // API contract:
-//   GET    /api/todos                  -> 200 [{ id, title, completed }]
-//   POST   /api/todos                  -> 201, or 400 ValidationProblemDetails when rejected:
+//   GET    /api/todos                  -> 200 [{ id, title, completed, priority }]
+//   POST   /api/todos                  -> body { title, priority }, where priority is
+//                                         "low", "normal" or "high"
+//                                      -> 201, or 400 ValidationProblemDetails when rejected:
 //                                         { errors: { "<field>": ["<message>", ...] } },
 //                                         e.g. errors.title = ["A title is required"]
 //   POST   /api/todos/{id}/complete    -> 2xx
 
 internal class ApiTodoDriver(HttpClient http) : ITodoDriver
 {
-    public async Task<DriverResult> Add(string title) =>
-        await ToResult(await http.PostAsJsonAsync("/api/todos", new { title }));
+    public async Task<DriverResult> Add(string title, Priority priority) =>
+        await ToResult(await http.PostAsJsonAsync("/api/todos", new { title, priority = ToWire(priority) }));
 
     public async Task<DriverResult> Complete(string title)
     {
@@ -29,6 +31,17 @@ internal class ApiTodoDriver(HttpClient http) : ITodoDriver
 
     public async Task<bool> IsComplete(string title) =>
         (await Find(title))?.Completed == true;
+
+    public async Task<bool> HasPriority(string title, Priority priority) =>
+        (await Find(title))?.Priority == ToWire(priority);
+
+    private static string ToWire(Priority priority) => priority switch
+    {
+        Priority.Low => "low",
+        Priority.Normal => "normal",
+        Priority.High => "high",
+        _ => throw new ArgumentOutOfRangeException(nameof(priority)),
+    };
 
     private static async Task<DriverResult> ToResult(HttpResponseMessage response) =>
         response.IsSuccessStatusCode
@@ -51,6 +64,6 @@ internal class ApiTodoDriver(HttpClient http) : ITodoDriver
         (await http.GetFromJsonAsync<TodoDto[]>("/api/todos"))!
             .FirstOrDefault(todo => todo.Title == title);
 
-    private record TodoDto(int Id, string Title, bool Completed);
+    private record TodoDto(int Id, string Title, bool Completed, string? Priority);
     private record ProblemDto(string? Title, string? Detail, Dictionary<string, string[]>? Errors);
 }

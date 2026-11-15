@@ -16,19 +16,26 @@ internal class TodosDsl : DslBase, ITodosSutDsl, ITodosApiDsl
     public static ITodosApiDsl ForApi(IChannel channel, SpecContext context) =>
         new TodosDsl(channel, context.ForPinnedChannel(nameof(Api)));
 
+    private static readonly Vocabulary<Priority> Priorities = new("priority")
+    {
+        ["low"] = Priority.Low,
+        ["normal"] = Priority.Normal,
+        ["high"] = Priority.High,
+    };
+
     private ITodoDriver Todos => _channel.Todos;
     private ITodoEntryDriver Entry =>
         Require(_channel.TodoEntry, "live feedback while entering a todo");
 
-    public async Task AttemptToAdd(string title) =>
-        Record(await Todos.Add(Alias.For(title)));
+    public async Task AttemptToAdd(string title, string priority) =>
+        Record(await Todos.Add(Alias.For(title), Priorities.Translate(priority)));
 
     public async Task AttemptToAddWithTitleOfLength(int length) =>
-        Record(await Todos.Add(Alias.OfLength(length)));
+        Record(await Todos.Add(Alias.OfLength(length), Priority.Normal));
 
-    public async Task Add(string title)
+    public async Task Add(string title, string priority)
     {
-        await AttemptToAdd(title);
+        await AttemptToAdd(title, priority);
         ConfirmLastActionSucceeded($"Could not add todo '{title}'");
     }
 
@@ -49,6 +56,10 @@ internal class TodosDsl : DslBase, ITodosSutDsl, ITodosApiDsl
         Assert.True(await Todos.IsComplete(Alias.For(title)),
             $"Expected todo '{title}' to be complete");
 
+    public async Task ConfirmPriority(string title, string priority) =>
+        Assert.True(await Todos.HasPriority(Alias.For(title), Priorities.Translate(priority)),
+            $"Expected todo '{title}' to have priority '{priority}'");
+
     public Task TypeTitleOfLength(int length) =>
         Entry.TypeTitle(Alias.OfLength(length));
 
@@ -56,9 +67,9 @@ internal class TodosDsl : DslBase, ITodosSutDsl, ITodosApiDsl
         Assert.True(await Entry.IsTitleTooLongWarningShown(),
             "Expected a warning that the title is too long");
 
-    public async Task AddCompleted(string title)
+    public async Task AddCompleted(string title, string priority)
     {
-        await Add(title);
+        await Add(title, priority);
         await Complete(title);
     }
 }

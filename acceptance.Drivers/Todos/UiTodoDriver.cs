@@ -6,20 +6,25 @@ namespace acceptance.Todos.Drivers;
 
 // UI contract (data-testid attributes):
 //   new-todo-title           text input for a new todo's title
+//   new-todo-priority        select for a new todo's priority, with options
+//                            low, normal and high; starts at normal
 //   add-todo                 submit button; stays enabled, rejections show an error
 //   title-too-long-warning   visible while the title being typed is too long,
 //                            before the todo is submitted
 //   todo-item                one per todo, with data-completed="true" or "false"
+//                            and data-priority="low", "normal" or "high"
 //   todo-title               the title text inside a todo-item
 //   complete-todo            control inside a todo-item that marks it complete
 //   error-message            visible when the last action was rejected
 
 internal class UiTodoDriver(IPage page) : ITodoDriver, ITodoEntryDriver
 {
-    public async Task<DriverResult> Add(string title)
+    public async Task<DriverResult> Add(string title, Priority priority)
     {
         await page.GotoAsync("/");
         await page.GetByTestId("new-todo-title").FillAsync(title);
+        if (priority != Priority.Normal)
+            await page.GetByTestId("new-todo-priority").SelectOptionAsync(ToUi(priority));
         await page.GetByTestId("add-todo").ClickAsync();
         return await Outcome(LocateTodo(title));
     }
@@ -42,6 +47,21 @@ internal class UiTodoDriver(IPage page) : ITodoDriver, ITodoEntryDriver
         await page.GotoAsync("/");
         return await Eventually(LocateCompletedTodo(title));
     }
+
+    public async Task<bool> HasPriority(string title, Priority priority)
+    {
+        await page.GotoAsync("/");
+        return await Eventually(
+            LocateTodo(title).And(page.Locator($"[data-priority='{ToUi(priority)}']")));
+    }
+
+    private static string ToUi(Priority priority) => priority switch
+    {
+        Priority.Low => "low",
+        Priority.Normal => "normal",
+        Priority.High => "high",
+        _ => throw new ArgumentOutOfRangeException(nameof(priority)),
+    };
 
     // FillAsync fires an input event, which is what the title input listens to.
     public async Task TypeTitle(string title)

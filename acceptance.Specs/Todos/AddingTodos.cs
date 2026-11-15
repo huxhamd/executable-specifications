@@ -10,6 +10,13 @@ public class AddingTodos : AcceptanceTestBase
         await Sut.Todos.Add(title: "Buy milk");
         await Sut.Todos.ConfirmShown(title: "Buy milk");
     }
+
+    [Fact]
+    public async Task UserCanGiveATodoAHighPriority()
+    {
+        await Sut.Todos.Add(title: "Pay rent", priority: "high");
+        await Sut.Todos.ConfirmPriority(title: "Pay rent", priority: "high");
+    }
     
     [Fact]
     public async Task UserCannotAddATodoWithoutATitle()
