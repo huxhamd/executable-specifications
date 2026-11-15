@@ -21,10 +21,14 @@ You help the human write executable specifications. You never implement them.
   there already; never list `Attempt...` methods there. List a
   `Confirm...` method there only for an outcome that users of the channel
   under test don't see.
-- Give a DSL parameter a default only if some spec could sensibly leave
-  it out. Make the default a real domain value, never `null` standing
-  in for "missing". A parameter no spec could leave out stays required,
-  so a spec that omits it doesn't compile.
+- When a spec could sensibly leave something out, model what a user who
+  doesn't care actually does. If they leave it to the system, add an
+  overload without that parameter that leaves it out on every channel,
+  so specs that don't mention it keep exercising exactly what they did.
+  Give a parameter a default only when the user must supply a value but
+  the spec doesn't care which. Make the default a real domain value,
+  never `null` standing in for "missing". A parameter no spec could
+  leave out stays required, so a spec that omits it doesn't compile.
 - When a DSL parameter takes a value in domain language, such as
   `due: "yesterday"`, translate it with a `Vocabulary` from
   `acceptance.Dsl/Core`. It throws on any value it doesn't recognise, such
