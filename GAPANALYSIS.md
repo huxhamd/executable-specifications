@@ -168,3 +168,15 @@ The analyzer references `Microsoft.CodeAnalysis.CSharp` 4.14.0. An analyzer can'
 The underlying principle: a DSL method describes what a user does, and a default is a choice made on the user's behalf. A user who doesn't care about priority doesn't choose normal; they don't choose at all, and the system decides. So priority is now an overload: `Add(title)` is unchanged down to the drivers, and `Add(title, priority)` sits beside it. A second spec, `ATodoHasNormalPriorityUnlessTheUserChoosesOne`, pins the product rule. The `spec-agent.md` rule now starts from what a user who doesn't care actually does. Defaults are kept for a value the user must supply but the spec doesn't care about.
 
 **Two kinds of default, 15 November.** "Default" had been used for two different things. A **product default** is what the system does when the user doesn't choose, such as a todo being normal priority. It's a requirement, so a spec states it, and the app-agent learns it from that failing spec. A **DSL default** is a value the harness fills in on the user's behalf, which suits only a value the user must supply but the spec doesn't care about. The first priority design used a DSL default for what was really a product default, which hid the requirement in the harness, where nothing specified or checked it. `spec-agent.md` and the walkthrough now name the two.
+
+
+## Confirming that something is absent (16 November 2026)
+
+Point 1 now has its harness side and an example: deleting a todo, on `practice` and in walkthrough step 10. The full reasoning is in `WAITING.md`; in short:
+
+- **Waiting for absence is its own query.** Negating a wait for presence either waits out the timeout or fails while the view is a moment behind. `ITodoDriver.IsGone` waits for the absence itself, and the DSL's `ConfirmNotShown` uses it.
+- **Absence needs a view you can trust.** Waiting and trust are separate questions. An empty or out-of-date view looks exactly like "gone", so an absence check can pass against a broken system, and waiting doesn't help. The UI's list carries a loaded marker that `IsGone` waits for first. Through the API, a synchronous read returns the complete, current list.
+- **That evidence belongs in the driver.** Confirming the todo is shown before deleting it would put timing into the spec, and wouldn't help, because the later check makes a fresh observation.
+- **Checking once states a promise.** The API contract now says it promises read-your-writes, which is why its queries check once. Polling every query "for consistency" would hide it if that promise were broken.
+
+The example doesn't show polling, because nothing is eventually consistent yet. That's still the bulk import item in `TODO.md`.

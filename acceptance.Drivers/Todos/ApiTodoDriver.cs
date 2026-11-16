@@ -9,6 +9,9 @@ namespace acceptance.Todos.Drivers;
 //                                         { errors: { "<field>": ["<message>", ...] } },
 //                                         e.g. errors.title = ["A title is required"]
 //   POST   /api/todos/{id}/complete    -> 2xx
+//
+// A read sees a write as soon as the write's response arrives (read-your-writes),
+// so queries check once.
 
 internal class ApiTodoDriver(HttpClient http) : ITodoDriver
 {
