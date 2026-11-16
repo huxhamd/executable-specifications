@@ -1,6 +1,6 @@
 # TODO
 
-* Confirming that something is absent, e.g. `ConfirmNotShown`, with deleting a todo as the example spec. The UI driver must confirm the list has loaded before waiting for the todo to be gone, or the check passes before anything has happened. (Gap analysis point 1)
+* ✅ Confirming that something is absent, e.g. `ConfirmNotShown`, with deleting a todo as the example spec. The UI driver must confirm the list has loaded before waiting for the todo to be gone, or the check passes before anything has happened. (Gap analysis point 1) (Harness and failing specs done, walkthrough step 10; the app side is the app-agent's)
 
 * Example spec for an error message that echoes a value, e.g. completing a todo that's already complete, with `ConfirmErrorIsShown` removing the alias. (Gap analysis point 3)
 

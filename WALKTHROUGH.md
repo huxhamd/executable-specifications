@@ -6,7 +6,7 @@ Oct 22, 2026, updated Nov 14, 2026 · @Daniel Huxham
 
 You'll build a tiny ToDo app (Angular front end, C# REST API) where you never write the app code yourself. You write executable specifications, lock them, and let Claude Code make them pass. Plan on two or three evenings.
 
-By the end you'll have practised the full loop five times, including one unhappy path, and you'll have proved the payoff: swapping the storage layer without touching a single spec.
+By the end you'll have practised the full loop six times, including one unhappy path, and you'll have proved the payoff: swapping the storage layer without touching a single spec.
 
 **Who owns what**
 
@@ -818,6 +818,9 @@ namespace acceptance.Todos.Drivers;
 //                                         { errors: { "<field>": ["<message>", ...] } },
 //                                         e.g. errors.title = ["A title is required"]
 //   POST   /api/todos/{id}/complete    -> 2xx
+//
+// A read sees a write as soon as the write's response arrives (read-your-writes),
+// so queries check once.
 
 internal class ApiTodoDriver(HttpClient http) : ITodoDriver
 {
@@ -2263,7 +2266,95 @@ Each driver's original `Add(title)` is untouched: the API driver still sends onl
 
 Run the same review checklist as step 6.
 
-## Step 10: Prove the point
+## Step 10: Confirming something is gone, deleting a todo
+
+Deleting a todo needs a check that something is no longer shown, and that's harder to get right than checking that it is. This step shows two things that `WAITING.md` explains in full: waiting for something to go, rather than negating a wait for it to appear, and making sure "not there" can be believed.
+
+**1. Write the specs**, in a new `DeletingTodos.cs`:
+
+```csharp
+[Fact]
+public async Task UserCanDeleteATodo()
+{
+    await Api.Todos.Add(title: "Buy milk");
+
+    await Sut.Todos.Delete(title: "Buy milk");
+    await Sut.Todos.ConfirmNotShown(title: "Buy milk");
+}
+
+[Fact]
+public async Task DeletingATodoLeavesTheOthers()
+{
+    await Api.Todos.Add(title: "Buy milk");
+    await Api.Todos.Add(title: "Pay rent");
+
+    await Sut.Todos.Delete(title: "Buy milk");
+    await Sut.Todos.ConfirmNotShown(title: "Buy milk");
+    await Sut.Todos.ConfirmShown(title: "Pay rent");
+}
+```
+
+Adding isn't the behaviour under test, so it goes through `Api.`. The second spec guards against a delete that removes too much. Notice what it doesn't do: it can't check that the list is now empty, because other specs' todos share the system. Each spec checks only the todos it created, through their aliases.
+
+**2. Don't negate a presence check.** `ITodosSutDsl` gains `AttemptToDelete`, `Delete` and `ConfirmNotShown`. The obvious `ConfirmNotShown` is `Assert.False(await Todos.IsShown(...))`, and it's wrong both ways round. `IsShown` waits for a yes, so if the todo really is gone it waits the full timeout before passing, and if the page is a moment behind it sees the todo and fails, even though deleting works. So the driver contract gets its own query, `IsGone`, which waits for the absence itself:
+
+```csharp
+public async Task ConfirmNotShown(string title) =>
+    Assert.True(await Todos.IsGone(Alias.For(title)),
+        $"Expected todo '{title}' not to be shown");
+```
+
+**3. Make "not there" believable.** Every absence check answers two separate questions: how long to keep looking, and whether the view it's looking at can be trusted. The second only matters for absence. An empty or out-of-date view looks exactly like "gone", so an absence check can pass against a broken system, and waiting doesn't help, because the wait succeeds at once.
+
+The UI shows why. When the page opens, the list is empty until the todos have been fetched. A naive `IsGone` would look at that empty list, find no "Buy milk", and pass, even if deleting did nothing. So the list carries a loaded marker, and `IsGone` waits for it before waiting for the todo to go:
+
+```csharp
+public async Task<bool> IsGone(string title)
+{
+    await page.GotoAsync("/");
+    await page.GetByTestId("todo-list").And(page.Locator("[data-loaded='true']"))
+        .WaitForAsync(new() { State = WaitForSelectorState.Attached });
+    return await Eventually(LocateTodo(title), WaitForSelectorState.Hidden);
+}
+```
+
+The marker is waited for as attached rather than visible, because an empty list can have no height and would never count as visible. Waiting for "at least one todo is shown" instead would depend on other specs' data, which breaks isolation.
+
+Through the API, one synchronous `GET` returns the complete, current list, so the response itself shows the view can be trusted. The API also promises read-your-writes, written in its contract, so `IsGone` checks once there, as the other API queries do. Polling every query "to be safe" would hide it if that promise were ever broken.
+
+Don't fix this in the spec by confirming the todo is shown before deleting it. That puts timing into the spec, and doesn't help anyway: the later check opens a fresh page, which the earlier sighting says nothing about. In both drivers, `Delete` already has to find the todo before it can act on it.
+
+**4. Decide the contract.** `ITodoDriver` gains `Delete(title)` and `IsGone(title)`. Update the contract comments:
+
+- **API:** `DELETE /api/todos/{id}` returns 2xx.
+- **UI:** a `delete-todo` control inside each `todo-item`, and a `todo-list` element with `data-loaded="true"` once the todos have been fetched.
+
+After a click, the UI driver waits on the same page for the todo to disappear, without reloading, just as `Add` waits for a new todo to appear. If deleting didn't update the page, the spec would rightly fail.
+
+**5. Watch them fail, for the right reason.** Run `pwsh -File scripts/run-acceptance-tests.ps1`. On the API, both specs fail at `Delete` with "Could not delete todo 'Buy milk'. The system said: 404 Not Found". On the UI, they time out looking for `delete-todo`.
+
+**6. Prove the absence check can fail.** Add a deliberately wrong spec that never deletes anything:
+
+```csharp
+[Fact]
+public async Task NeverDeletes()
+{
+    await Api.Todos.Add(title: "Buy milk");
+    await Sut.Todos.ConfirmNotShown(title: "Buy milk");
+}
+```
+
+It must fail on both channels. Once the app is implemented, try removing the loaded-marker wait from `IsGone` and run it on the UI again: it can now pass, against a todo that was never deleted. That's the false pass the marker exists to prevent. Put the wait back and delete the spec.
+
+**7. Commit and hand it over** in a new app-agent session:
+
+```text
+/implement-spec UserCanDeleteATodo and DeletingATodoLeavesTheOthers
+```
+
+Run the same review checklist as step 6.
+
+## Step 11: Prove the point
 
 This is the payoff: big implementation changes with zero changes to the acceptance projects. Try at least the first two.
 
