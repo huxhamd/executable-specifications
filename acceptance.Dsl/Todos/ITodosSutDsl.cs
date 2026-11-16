@@ -13,9 +13,13 @@ public interface ITodosSutDsl : ISutDsl
     Task AttemptToComplete(string title);
     Task Complete(string title);
 
+    Task AttemptToDelete(string title);
+    Task Delete(string title);
+
     Task ConfirmShown(string title);
     Task ConfirmComplete(string title);
     Task ConfirmPriority(string title, string priority);
+    Task ConfirmNotShown(string title);
 
     Task TypeTitleOfLength(int length);
     Task ConfirmWarnedTitleIsTooLong();

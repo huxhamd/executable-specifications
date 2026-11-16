@@ -57,6 +57,15 @@ internal class TodosDsl : DslBase, ITodosSutDsl, ITodosApiDsl
         ConfirmLastActionSucceeded($"Could not complete todo '{title}'");
     }
 
+    public async Task AttemptToDelete(string title) =>
+        Record(await Todos.Delete(Alias.For(title)));
+
+    public async Task Delete(string title)
+    {
+        await AttemptToDelete(title);
+        ConfirmLastActionSucceeded($"Could not delete todo '{title}'");
+    }
+
     public async Task ConfirmShown(string title) =>
         Assert.True(await Todos.IsShown(Alias.For(title)),
             $"Expected todo '{title}' to be shown");
@@ -68,6 +77,10 @@ internal class TodosDsl : DslBase, ITodosSutDsl, ITodosApiDsl
     public async Task ConfirmPriority(string title, string priority) =>
         Assert.True(await Todos.HasPriority(Alias.For(title), Priorities.Translate(priority)),
             $"Expected todo '{title}' to have priority '{priority}'");
+
+    public async Task ConfirmNotShown(string title) =>
+        Assert.True(await Todos.IsGone(Alias.For(title)),
+            $"Expected todo '{title}' not to be shown");
 
     public Task TypeTitleOfLength(int length) =>
         Entry.TypeTitle(Alias.OfLength(length));

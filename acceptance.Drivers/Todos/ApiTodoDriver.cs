@@ -11,6 +11,7 @@ namespace acceptance.Todos.Drivers;
 //                                         { errors: { "<field>": ["<message>", ...] } },
 //                                         e.g. errors.title = ["A title is required"]
 //   POST   /api/todos/{id}/complete    -> 2xx
+//   DELETE /api/todos/{id}             -> 2xx
 //
 // A read sees a write as soon as the write's response arrives (read-your-writes),
 // so queries check once.
@@ -32,6 +33,15 @@ internal class ApiTodoDriver(HttpClient http) : ITodoDriver
         return await ToResult(await http.PostAsync($"/api/todos/{todo.Id}/complete", null));
     }
 
+    public async Task<DriverResult> Delete(string title)
+    {
+        var todo = await Find(title);
+        if (todo is null)
+            return DriverResult.Fail($"No todo titled '{title}'");
+
+        return await ToResult(await http.DeleteAsync($"/api/todos/{todo.Id}"));
+    }
+
     public async Task<bool> IsShown(string title) =>
         await Find(title) is not null;
 
@@ -40,6 +50,9 @@ internal class ApiTodoDriver(HttpClient http) : ITodoDriver
 
     public async Task<bool> HasPriority(string title, Priority priority) =>
         (await Find(title))?.Priority == ToWire(priority);
+
+    public async Task<bool> IsGone(string title) =>
+        await Find(title) is null;
 
     private static string ToWire(Priority priority) => priority switch
     {
@@ -57,7 +70,10 @@ internal class ApiTodoDriver(HttpClient http) : ITodoDriver
     private static async Task<string> BodyOrProblem(HttpResponseMessage response)
     {
         if (response.Content.Headers.ContentType?.MediaType != "application/problem+json")
-            return await response.Content.ReadAsStringAsync();
+        {
+            var body = await response.Content.ReadAsStringAsync();
+            return body.Length > 0 ? body : $"{(int)response.StatusCode} {response.ReasonPhrase}";
+        }
 
         var problem = await response.Content.ReadFromJsonAsync<ProblemDto>();
         return problem?.Errors?.Values.SelectMany(messages => messages).FirstOrDefault()
