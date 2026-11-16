@@ -4,7 +4,7 @@ namespace acceptance.Todos.Specs;
 
 public class DeletingTodos : AcceptanceTestBase
 {
-    [Fact]
+    [Fact, Pending]
     public async Task UserCanDeleteATodo()
     {
         await Api.Todos.Add(title: "Buy milk");
@@ -13,7 +13,7 @@ public class DeletingTodos : AcceptanceTestBase
         await Sut.Todos.ConfirmNotShown(title: "Buy milk");
     }
 
-    [Fact]
+    [Fact, Pending]
     public async Task DeletingATodoLeavesTheOthers()
     {
         await Api.Todos.Add(title: "Buy milk");

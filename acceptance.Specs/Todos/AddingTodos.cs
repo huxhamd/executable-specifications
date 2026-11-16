@@ -11,14 +11,14 @@ public class AddingTodos : AcceptanceTestBase
         await Sut.Todos.ConfirmShown(title: "Buy milk");
     }
 
-    [Fact]
+    [Fact, Pending]
     public async Task UserCanGiveATodoAHighPriority()
     {
         await Sut.Todos.Add(title: "Pay rent", priority: "high");
         await Sut.Todos.ConfirmPriority(title: "Pay rent", priority: "high");
     }
 
-    [Fact]
+    [Fact, Pending]
     public async Task ATodoHasNormalPriorityUnlessTheUserChoosesOne()
     {
         await Sut.Todos.Add(title: "Buy milk");

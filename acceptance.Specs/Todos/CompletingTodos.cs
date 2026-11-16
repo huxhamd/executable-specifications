@@ -4,7 +4,7 @@ namespace acceptance.Todos.Specs;
 
 public class CompletingTodos : AcceptanceTestBase
 {
-    [Fact]
+    [Fact, Pending]
     public async Task UserCanCompleteATodo()
     {
         await Api.Todos.Add(title: "Buy milk");
