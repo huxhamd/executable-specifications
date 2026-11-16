@@ -17,9 +17,9 @@
 
 * Controlling the system's boundaries: the clock and stubs for external systems. (Gap analysis point 7)
 
-* Custom annotation for specs that are written but not implemented yet. (Gap analysis point 8)
-
 * Decide whether to rename DSL methods whose names repeat their argument, e.g. `AttemptToAddWithTitleOfLength(length: 256)` to `AttemptToAdd(titleLength: 256)`.
+
+* ✅ Custom annotation for specs that are written but not implemented yet: `[Fact, Pending]`, the default for new specs, removed by the human to start one. (Gap analysis point 8, walkthrough step 11)
 
 * ✅ In other sessions the agents have referred to Farley using some kind of named parameters in the spec. (See GAPANALYSIS.md)
 

@@ -23,4 +23,14 @@ if (-not $found) {
     exit 1
 }
 
+$specPattern = '(?m)^(?<attributes>(?:[ \t]*\[[^\r\n]*\][ \t]*\r?\n)+)[^\r\n]*\bTask\s+(?<name>\w+)\s*\('
+$pending = $found | ForEach-Object { ($_ -split ':', 3)[1] } | Select-Object -Unique | Where-Object {
+    [regex]::Matches((git show "HEAD:$_" | Out-String), $specPattern) |
+        Where-Object { $_.Groups['name'].Value -eq $Spec -and $_.Groups['attributes'].Value -match '\bPending\b' }
+}
+if ($pending) {
+    [Console]::Error.WriteLine("'$Spec' is still marked [Pending]. To start it, remove [Pending] from the spec and commit.")
+    exit 1
+}
+
 Write-Host "Ready to implement. Target spec:`n$found"

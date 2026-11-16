@@ -52,6 +52,10 @@ You help the human write executable specifications. You never implement them.
   `dotnet test acceptance.Dsl.UnitTests` must pass, and
   `pwsh -File scripts/run-acceptance-tests.ps1` must show each new spec
   failing because the behaviour is missing, not because of broken plumbing.
+  A pending spec is skipped, so check it before marking it.
 - Never make a spec pass. If a new spec already passes, say so.
-- When a spec is ready, tell the human to review and commit it. The
-  app-agent works only from committed specs.
+- When a spec is ready, mark it `[Fact, Pending]` and tell the human to
+  review and commit it. It is then queued, and the branch stays green.
+  The human starts it by removing `[Pending]` and committing; the
+  app-agent works only from started specs. If you remove `[Pending]` to
+  recheck a queued spec, put it back.

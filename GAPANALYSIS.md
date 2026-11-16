@@ -180,3 +180,18 @@ Point 1 now has its harness side and an example: deleting a todo, on `practice` 
 - **Checking once states a promise.** The API contract now says it promises read-your-writes, which is why its queries check once. Polling every query "for consistency" would hide it if that promise were broken.
 
 The example doesn't show polling, because nothing is eventually consistent yet. That's still the bulk import item in `TODO.md`.
+
+
+## Specs written before they are implemented (16 November 2026)
+
+Point 8 was filed as a process question, but it's a real gap. A spec can be agreed and not yet started, which is the normal state in acceptance test-driven development. Before this change the harness had no way to say so: a spec was either committed, and had to pass, or not committed at all. It comes up as soon as the spec agent gets ahead of the app agent, which the parallel worktrees in the walkthrough invite. Keeping queued specs on a side branch was rejected. A committed spec keeps compiling against the DSL, so a DSL refactor updates it too, while one on a side branch goes stale unnoticed.
+
+**The marker.** `[Fact, Pending]`, in `acceptance.Dsl/Core/Wiring`, skips the spec on every channel with a reason, as `Channels` does. It applies to methods only, because each spec is started on its own. This follows Farley's custom annotation for work-in-progress acceptance tests and LMAX's `@Ignored`, used here as reference only.
+
+**Skipped, not run and expected to fail.** Running pending specs and failing the run if one passes would catch a spec that already passes or fails for the wrong reason. It was rejected for three reasons. Each pending spec would cost a full timeout on the UI on every run, and that grows with the queue. It would need a custom test case or a second filtered test pass. And the two checks that matter happen anyway: the spec agent's before it marks a spec, and `implement-spec` step 3 when the spec is started.
+
+**Pending by default.** The spec agent hands every new spec over marked `[Pending]`. Committing a spec therefore never turns the branch red. Only started specs fail, and they're started on the app agent's branch. A queue of one is not a special case, so nobody has to judge whether something else is already queued.
+
+**Only the human starts a spec**, by removing `[Pending]` and committing. The app agent can't edit specs, so it can't remove the marker. The rule is in `CLAUDE.md`, and the spec agent restores the marker if it removes it to recheck a spec. `check-ready-to-implement.ps1` refuses a pending target, and `check-done.ps1` lists pending specs by name after its summary. Both find the marker by reading the spec's attributes, not by running anything.
+
+**The examples.** On `practice`, the five specs the app doesn't implement yet are marked pending: priority (two), completing, and deleting (two). They form a real queue, started one feature at a time. In the walkthrough, step 11 queues reopening a completed todo. "Prove the point" is now step 12.
