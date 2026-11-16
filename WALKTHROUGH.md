@@ -256,7 +256,7 @@ Every `Core/` and domain folder in `acceptance.Drivers` and `acceptance.Dsl` has
 
 The projects reference each other in one direction only, and the compiler enforces the layering:
 
-- **Specs see only the DSL.** `acceptance.Specs` sees what `acceptance.Dsl` makes public: `AcceptanceTestBase`, the `Sut` and `Api` roots, the DSL interfaces, `ChannelType` and the `Channels` attribute. The DSL classes themselves are `internal`. A spec that tries to skip the DSL doesn't compile.
+- **Specs see only the DSL.** `acceptance.Specs` sees what `acceptance.Dsl` makes public: `AcceptanceTestBase`, the `Sut` and `Api` roots, the DSL interfaces, `ChannelType`, and the `Channels` and `Pending` attributes. The DSL classes themselves are `internal`. A spec that tries to skip the DSL doesn't compile.
 - **Only the DSL sees the drivers.** Everything in `acceptance.Drivers` is `internal`, and `InternalsVisibleTo` names the DSL as the one project allowed in.
 - **Only the drivers see Playwright.** The DSL and the specs get it at runtime, but can't compile against it.
 - **Drivers can't give verdicts.** `acceptance.Drivers` has no xUnit, so `Assert` doesn't exist there. Playwright's own assertions do, because they ship in the package the drivers need: `using static Microsoft.Playwright.Assertions;` in a driver means a verdict has crept into the wrong layer. Drivers report, the DSL decides.
@@ -324,6 +324,26 @@ public sealed class ChannelsAttribute(params ChannelType[] channels) : BeforeAft
     }
 }
 ```
+
+### acceptance.Dsl/Core/Wiring/PendingAttribute.cs
+
+A spec can be written well before anyone builds it. Marked `[Fact, Pending]`, it is committed and compiled with everything else, but skipped on every channel, so it doesn't turn the build red while it waits. Step 11 shows how it's used.
+
+```csharp
+using System.Reflection;
+using Xunit.v3;
+
+namespace acceptance.Core.Dsl;
+
+[AttributeUsage(AttributeTargets.Method)]
+public sealed class PendingAttribute : BeforeAfterTestAttribute
+{
+    public override void Before(MethodInfo methodUnderTest, IXunitTest test) =>
+        Assert.Skip("Pending: written but not started. Remove [Pending] to start it");
+}
+```
+
+It applies to single specs only, not whole classes, because each spec is started on its own. The scripts find it by reading the spec's attributes, so they can tell a pending spec from a started one without running anything.
 
 ### acceptance.Dsl/Core/Alias.cs
 
@@ -1662,7 +1682,9 @@ The working agreement every session shares, whatever its role. Claude Code reads
 - The drivers in `acceptance.Drivers/<Domain>` define the contract: API routes,
   JSON shape and the UI's `data-testid` attributes.
 - Specs describe behaviour in domain language. Every spec must pass on
-  every channel unless it is marked `[Fact, Channels(...)]`.
+  every channel unless it is marked `[Fact, Channels(...)]`, or
+  `[Pending]`: written but not started, and skipped. Only the human
+  starts a spec, by removing `[Pending]` and committing.
 - Specs reach the system through two roots, named for their channel.
   `Api.` (`Api.Todos.Add(...)`) is pinned to the API on every run, and
   `Sut.` (`Sut.Todos.Complete(...)`) is the channel under test. Specs
@@ -1883,9 +1905,13 @@ You help the human write executable specifications. You never implement them.
   `dotnet test acceptance.Dsl.UnitTests` must pass, and
   `pwsh -File scripts/run-acceptance-tests.ps1` must show each new spec
   failing because the behaviour is missing, not because of broken plumbing.
+  A pending spec is skipped, so check it before marking it.
 - Never make a spec pass. If a new spec already passes, say so.
-- When a spec is ready, tell the human to review and commit it. The
-  app-agent works only from committed specs.
+- When a spec is ready, mark it `[Fact, Pending]` and tell the human to
+  review and commit it. It is then queued, and the branch stays green.
+  The human starts it by removing `[Pending]` and committing; the
+  app-agent works only from started specs. If you remove `[Pending]` to
+  recheck a queued spec, put it back.
 ```
 
 **`.claude/roles/app-agent.md`**
@@ -2017,8 +2043,8 @@ The scripts are PowerShell, so they run the same on Windows, macOS and Linux wit
 | --- | --- |
 | `scripts/set-role.ps1` | Sets the role for this worktree's next session, or shows the roles; the terminal version of the role commands |
 | `scripts/run-acceptance-tests.ps1` | Starts Docker if needed, deploys fresh containers, runs every spec on each channel, or on one with `-Channel ui`. With no specs yet, it says so and exits without deploying |
-| `scripts/check-ready-to-implement.ps1` | Checks the tree is clean and the named spec is committed |
-| `scripts/check-done.ps1` | The definition of done: the protected-files check, all unit tests, the DSL's included, the API integration tests once that project exists, and all acceptance tests once there are specs. Anything it skips is reported as `SKIP` with the reason |
+| `scripts/check-ready-to-implement.ps1` | Checks the tree is clean and the named spec is committed and not marked `[Pending]` |
+| `scripts/check-done.ps1` | The definition of done: the protected-files check, all unit tests, the DSL's included, the API integration tests once that project exists, and all acceptance tests once there are specs. Anything it skips is reported as `SKIP` with the reason, and pending specs are listed by name |
 
 The ones you run most also have commands in the Claude Code chat, so they tab-complete: `/run-specs [channel]`, `/check-done` and `/check-ready <SpecName>`. Claude runs the script and summarises the result. The commands are small files in `.claude/commands/`; the scripts still work on their own in a terminal.
 
@@ -2078,6 +2104,8 @@ pwsh -File scripts/run-acceptance-tests.ps1
 The API run should fail on `Sut.Todos.Add` with "Could not add todo 'Buy milk'", because the API has no `/api/todos` yet. The UI run should time out looking for `new-todo-title`. If it fails anywhere else, your plumbing has a bug; fix that first.
 
 **3. Commit the spec.** `git add -A && git commit -m "Spec: user can add a todo"`
+
+You're starting this spec straight away, so it goes in as it is. A spec agent hands specs over marked `[Fact, Pending]`, so they don't turn the build red before anyone starts them. When you hand one of those on, remove `[Pending]` and commit first. Step 11 shows why.
 
 **4. Hand it to the agent.** In Claude Code, make this worktree's role the app agent and start a fresh session:
 
@@ -2354,7 +2382,34 @@ It must fail on both channels. Once the app is implemented, try removing the loa
 
 Run the same review checklist as step 6.
 
-## Step 11: Prove the point
+## Step 11: Queue a spec, written now and built later
+
+Specs are cheapest to write while the conversation about a feature is fresh, which is often well before anyone is free to build it. Committed, they keep compiling against the DSL, so renaming a DSL method updates them too; a spec kept on a side branch goes stale without anyone noticing. But a committed spec that fails turns `check-done.ps1` red for everyone, and an app agent working on something else can never finish. Farley describes his team marking such tests with a custom annotation so they could be tracked without being run; `[Pending]` is the same idea, worked out for this harness.
+
+**1. Queue a spec.** With a spec agent, write a spec for a feature nobody is building yet, such as reopening a completed todo. The spec agent writes the DSL and the driver contract it needs too, as in step 8. Reopening is checked by waiting for the todo to show as not complete (`data-completed="false"`), never by negating `ConfirmComplete`, for the reasons in step 10. It watches the spec fail for the right reason, then hands it over marked:
+
+```csharp
+[Fact, Pending]
+public async Task UserCanReopenACompletedTodo()
+{
+    await Api.Todos.AddCompleted(title: "Buy milk");
+
+    await Sut.Todos.Reopen(title: "Buy milk");
+    await Sut.Todos.ConfirmNotComplete(title: "Buy milk");
+}
+```
+
+Commit it. Run `pwsh -File scripts/check-done.ps1`: it passes, with the spec reported as skipped on both channels and listed by name under the summary. The new DSL methods and driver contract are committed too. They do nothing until the spec runs, and the app agent will build against them.
+
+**2. Try to start it too early.** `/check-ready UserCanReopenACompletedTodo` refuses: the spec is still pending.
+
+**3. Start it.** In the app agent's worktree, remove `[Pending]` and commit (`Start: user can reopen a completed todo`), then hand it over with `/implement-spec`. That branch is now red until the work is done, while the branch you write specs on stays green. The skill confirms the spec still fails for the right reason before any work starts, which also catches a spec that went stale while it waited.
+
+Only you start a spec. The app agent can't edit specs, so it can't remove the marker, and the spec agent puts the marker back if it removes it to recheck a spec. Removing it is the decision to build, and the commit records when it was made.
+
+Pending specs are skipped rather than run and expected to fail. Running them would catch a pending spec that already passes, or one that fails for the wrong reason, but each one would cost a full timeout on the UI on every run, and the cost grows with the queue. The two checks that matter already happen without it: the spec agent's before it marks the spec, and the skill's when the spec is started.
+
+## Step 12: Prove the point
 
 This is the payoff: big implementation changes with zero changes to the acceptance projects. Try at least the first two.
 

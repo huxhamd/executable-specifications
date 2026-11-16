@@ -1,5 +1,5 @@
 ---
-description: "Check a spec is ready to hand to the app agent: clean tree, spec committed"
+description: "Check a spec is ready to hand to the app agent: clean tree, spec committed and not pending"
 argument-hint: "<SpecName>"
 disable-model-invocation: true
 ---

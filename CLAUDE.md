@@ -21,7 +21,9 @@
 - The drivers in `acceptance.Drivers/<Domain>` define the contract: API routes,
   JSON shape and the UI's `data-testid` attributes.
 - Specs describe behaviour in domain language. Every spec must pass on
-  every channel unless it is marked `[Fact, Channels(...)]`.
+  every channel unless it is marked `[Fact, Channels(...)]`, or
+  `[Pending]`: written but not started, and skipped. Only the human
+  starts a spec, by removing `[Pending]` and committing.
 - Specs reach the system through two roots, named for their channel.
   `Api.` (`Api.Todos.Add(...)`) is pinned to the API on every run, and
   `Sut.` (`Sut.Todos.Complete(...)`) is the channel under test. Specs
